@@ -1,21 +1,42 @@
 from string import punctuation
 
-from cli.lib.search_utils import load_movies, Movie
+from cli.lib.search_utils import load_movies, Movie, DEFAULT_SEARCH_LIMIT
 
 
 def preprocess_text(text: str):
     text = text.lower()
-    punctuation_translation_table = str.maketrans("","",punctuation)
-    text = text.translate(punctuation_translation_table)
+    text = text.translate(str.maketrans("", "", punctuation))
     return text
 
-def search_command(query: str, limit: int = 5) -> list[Movie]:
+def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[Movie]:
     movies = load_movies()
     results = []
-    processed_query = preprocess_text(query)
+    query_tokens = tokenize_text(query)
     for movie in movies:
-        if processed_query in preprocess_text(movie["title"]):
+        title_tokens = tokenize_text(movie["title"])
+        if has_matching_token(query_tokens, title_tokens):
             results.append(movie)
             if len(results) >= limit:
                 break
+
     return results
+
+
+def has_matching_token(query_tokens: list[str], title_tokens: list[str]) -> bool:
+    for query_token in query_tokens:
+        for title_token in title_tokens:
+            if query_token in title_token:
+                return True
+    return False
+
+
+
+
+def tokenize_text(text: str) -> list[str]:
+    text = preprocess_text(text)
+    tokens = text.split()
+    valid_tokens = []
+    for token in tokens:
+        if token:
+            valid_tokens.append(token)
+    return valid_tokens
