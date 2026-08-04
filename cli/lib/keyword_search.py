@@ -1,9 +1,9 @@
 from string import punctuation
 
-from cli.lib.search_utils import load_movies, Movie, DEFAULT_SEARCH_LIMIT
+from cli.lib.search_utils import load_movies, Movie, DEFAULT_SEARCH_LIMIT, get_stopwords
 
 
-def preprocess_text(text: str):
+def preprocess_text(text: str) -> str:
     text = text.lower()
     text = text.translate(str.maketrans("", "", punctuation))
     return text
@@ -35,8 +35,6 @@ def has_matching_token(query_tokens: list[str], title_tokens: list[str]) -> bool
 def tokenize_text(text: str) -> list[str]:
     text = preprocess_text(text)
     tokens = text.split()
-    valid_tokens = []
-    for token in tokens:
-        if token:
-            valid_tokens.append(token)
+    stopwords = get_stopwords()
+    valid_tokens = list(filter(lambda token: token not in stopwords and token != "", tokens))
     return valid_tokens
