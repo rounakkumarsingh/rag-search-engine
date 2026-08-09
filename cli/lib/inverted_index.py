@@ -3,7 +3,7 @@ from pickle import dump, load
 import os
 from collections import defaultdict, Counter
 from typing import Callable
-from cli.lib.search_utils import PROJECT_ROOT, tokenize_text_all
+from cli.lib.search_utils import PROJECT_ROOT, tokenize_text_all, BM25_K1
 from cli.lib.document import Document
 
 
@@ -45,6 +45,10 @@ class InvertedIndex:
         N = len(self.docmap)
         df = len(self.index.get(term, []))
         return math.log((N - df + 0.5) / (df + 0.5) + 1)
+
+    def get_bm25_tf(self, doc_id: str, term: str, k1:float = BM25_K1):
+        tf = self.get_tf(doc_id, term)
+        return (tf * (k1 + 1)) / (tf + k1)
 
     def tfidf(self, doc_id, term: str) -> float:
         tf = self.get_tf(doc_id, term)
