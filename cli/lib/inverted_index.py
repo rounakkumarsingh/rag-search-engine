@@ -41,6 +41,11 @@ class InvertedIndex:
         df = len(self.index.get(term, []))
         return math.log((N + 1) / (df + 1))
 
+    def tfidf(self, doc_id, term: str) -> float:
+        tf = self.get_tf(doc_id, term)
+        idf = self.idf(term)
+        return tf * idf
+
     def save(self):
         cache_path = os.path.join(PROJECT_ROOT, "cache")
         if not os.path.isdir(cache_path):
