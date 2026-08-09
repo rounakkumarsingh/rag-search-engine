@@ -26,6 +26,9 @@ def main() -> None:
     tfidf_parser.add_argument("doc_id", type=str, help="Document ID")
     tfidf_parser.add_argument("term", type=str, help="Term to look up")
 
+    bm25_idf_parser = subparsers.add_parser("bm25idf", help="Get BM25 IDF score for a given term")
+    bm25_idf_parser.add_argument("term", type=str, help="Term to get BM25 IDF score for")
+
     args = parser.parse_args()
 
     match args.command:
@@ -67,6 +70,16 @@ def main() -> None:
             token = tokenize_single_term(args.term)
             tf_idf = ii.tfidf(args.doc_id, token)
             print(f"TF-IDF score of '{args.term}' in document '{args.doc_id}': {tf_idf:.2f}")
+        case "bm25idf":
+            ii = InvertedIndex(load_movies)
+            try:
+                ii.load()
+            except Exception:
+                print("Index not found. Please build index first.")
+                sys.exit(1)
+            token = tokenize_single_term(args.term)
+            bm25idf = ii.get_bm25_idf(token)
+            print(f"BM25 IDF score of '{args.term}': {bm25idf:.2f}")
         case _:
             parser.print_help()
 
