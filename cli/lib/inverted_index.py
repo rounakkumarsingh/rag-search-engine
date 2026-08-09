@@ -1,3 +1,4 @@
+import math
 from pickle import dump, load
 import os
 from collections import defaultdict, Counter
@@ -16,8 +17,10 @@ class InvertedIndex:
     def __add_document(self, doc_id: str, text: str):
         text_tokens = tokenize_text_all(text)
         for token in text_tokens:
-            self.index[token].append(doc_id)
             self.term_frequencies[doc_id][token] += 1
+        unique_tokens = set(text_tokens)
+        for token in unique_tokens:
+            self.index[token].append(doc_id)
 
     def get_documents(self, term: str) -> list[Document]:
         doc_ids = self.index.get(term, [])
@@ -32,6 +35,11 @@ class InvertedIndex:
     def get_tf(self, doc_id, term):
         # Assuming term is a single token
         return self.term_frequencies[doc_id][term]
+
+    def idf(self, term: str) -> float:
+        N = len(self.docmap)
+        df = len(self.index.get(term, []))
+        return math.log((N + 1) / (df + 1))
 
     def save(self):
         cache_path = os.path.join(PROJECT_ROOT, "cache")

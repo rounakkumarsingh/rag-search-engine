@@ -19,6 +19,9 @@ def main() -> None:
     tf_parser.add_argument("doc_id", type=str, help="Document ID")
     tf_parser.add_argument("term", type=str, help="Term to look up")
 
+    idf_parser = subparsers.add_parser("idf", help="Get inverse document frequency for a term")
+    idf_parser.add_argument("term", type=str, help="Term to look up")
+
     args = parser.parse_args()
 
     match args.command:
@@ -40,6 +43,16 @@ def main() -> None:
                 sys.exit(1)
             token = tokenize_single_term(args.term)
             print(ii.get_tf(args.doc_id, token))
+        case "idf":
+            ii = InvertedIndex(load_movies)
+            try:
+                ii.load()
+            except Exception:
+                print("Index not found. Please build index first.")
+                sys.exit(1)
+            token = tokenize_single_term(args.term)
+            idf = ii.idf(token)
+            print(f"Inverse document frequency of '{args.term}': {idf:.2f}")
         case _:
             parser.print_help()
 
