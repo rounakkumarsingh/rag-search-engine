@@ -31,3 +31,13 @@ def bm25_tf_command(doc_id: str, term: str, k1: float = BM25_K1, b: float = BM25
         sys.exit(1)
     token = tokenize_single_term(term)
     return inverted_index.get_bm25_tf(doc_id, token, k1, b)
+
+
+def bm25_search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> dict[Document, float]:
+    inverted_index = InvertedIndex(load_movies)
+    try:
+        inverted_index.load()
+    except Exception:
+        print("Index not found. Please build index first.")
+        sys.exit(1)
+    return inverted_index.bm25_search(query, limit)
