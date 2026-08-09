@@ -8,6 +8,7 @@ STOPWORDS_PATH = os.path.join(PROJECT_ROOT, "data", "stopwords.txt")
 DEFAULT_SEARCH_LIMIT: Final = 5
 
 BM25_K1 = 1.5
+BM25_B = 0.75
 
 STOPWORDS: list[str] = []
 def get_stopwords():

@@ -3,7 +3,7 @@ from pickle import dump, load
 import os
 from collections import defaultdict, Counter
 from typing import Callable
-from cli.lib.search_utils import PROJECT_ROOT, tokenize_text_all, BM25_K1
+from cli.lib.search_utils import PROJECT_ROOT, tokenize_text_all, BM25_K1, BM25_B
 from cli.lib.document import Document
 
 
@@ -12,15 +12,22 @@ class InvertedIndex:
         self.load_documents = load_documents
         self.index: dict[str, list[str]] = defaultdict(list)
         self.docmap: dict[str, Document] = {}
+        self.doc_lengths: dict[str, int] = defaultdict(int)
         self.term_frequencies:dict[str, Counter] = defaultdict(Counter)
 
     def __add_document(self, doc_id: str, text: str):
         text_tokens = tokenize_text_all(text)
         for token in text_tokens:
             self.term_frequencies[doc_id][token] += 1
+        self.doc_lengths[doc_id] = len(text_tokens)
         unique_tokens = set(text_tokens)
         for token in unique_tokens:
             self.index[token].append(doc_id)
+    
+    def __get_avg_doc_length(self) -> float:
+        if (len(self.doc_lengths) == 0):
+            return 0.0
+        return sum(self.doc_lengths.values()) / len(self.doc_lengths)
 
     def get_documents(self, term: str) -> list[Document]:
         doc_ids = self.index.get(term, [])
@@ -46,9 +53,10 @@ class InvertedIndex:
         df = len(self.index.get(term, []))
         return math.log((N - df + 0.5) / (df + 0.5) + 1)
 
-    def get_bm25_tf(self, doc_id: str, term: str, k1:float = BM25_K1):
+    def get_bm25_tf(self, doc_id: str, term: str, k1: float = BM25_K1, b: float = BM25_B) -> float:
         tf = self.get_tf(doc_id, term)
-        return (tf * (k1 + 1)) / (tf + k1)
+        length_norm = 1 - b + b * (self.doc_lengths[doc_id] / self.__get_avg_doc_length())
+        return (tf * (k1 + 1)) / (tf + k1 * length_norm)
 
     def tfidf(self, doc_id, term: str) -> float:
         tf = self.get_tf(doc_id, term)
@@ -62,23 +70,29 @@ class InvertedIndex:
         INDEX_CACHE_PATH = os.path.join(cache_path, "index.pkl")
         DOCMAP_CACHE_PATH = os.path.join(cache_path, "docmap.pkl")
         TERM_FREQ_CACHE_PATH = os.path.join(cache_path, "term_frequencies.pkl")
+        DOC_LENGTH_CACHE_PATH = os.path.join(cache_path, "doc_lengths.pkl")
         with open(INDEX_CACHE_PATH, "wb") as f:
             dump(self.index, f)
         with open(DOCMAP_CACHE_PATH, "wb") as f:
             dump(self.docmap, f)
         with open(TERM_FREQ_CACHE_PATH, "wb") as f:
             dump(self.term_frequencies, f)
+        with open(DOC_LENGTH_CACHE_PATH, "wb") as f:
+            dump(self.doc_lengths, f)
 
     def load(self):
         cache_path = os.path.join(PROJECT_ROOT, "cache")
         INDEX_CACHE_PATH = os.path.join(cache_path, "index.pkl")
         DOCMAP_CACHE_PATH = os.path.join(cache_path, "docmap.pkl")
         TERM_FREQ_CACHE_PATH = os.path.join(cache_path, "term_frequencies.pkl")
+        DOC_LENGTH_CACHE_PATH = os.path.join(cache_path, "doc_lengths.pkl")
         with open(INDEX_CACHE_PATH, "rb") as f:
             self.index = load(f)
         with open(DOCMAP_CACHE_PATH, "rb") as f:
             self.docmap = load(f)
         with open(TERM_FREQ_CACHE_PATH, "rb") as f:
             self.term_frequencies = load(f)
+        with open(DOC_LENGTH_CACHE_PATH, "rb") as f:
+            self.doc_lengths = load(f)
 
 

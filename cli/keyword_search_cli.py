@@ -4,7 +4,7 @@ import sys
 from cli.lib.inverted_index import InvertedIndex
 from cli.lib.keyword_search import search_command, bm25_tf_command
 from cli.lib.movies import load_movies
-from cli.lib.search_utils import tokenize_single_term, BM25_K1
+from cli.lib.search_utils import tokenize_single_term, BM25_K1, BM25_B
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -33,6 +33,7 @@ def main() -> None:
     bm25_tf_parser.add_argument("doc_id", type=int, help="Document ID")
     bm25_tf_parser.add_argument("term", type=str, help="Term to get BM25 TF score for")
     bm25_tf_parser.add_argument("k1", type=float, nargs="?", default=BM25_K1, help="Tunable BM25 K1 parameter")
+    bm25_tf_parser.add_argument("b", type=float, nargs="?", default=BM25_B, help="Tunable BM25 b parameter")
 
     args = parser.parse_args()
 
@@ -86,7 +87,7 @@ def main() -> None:
             bm25idf = ii.get_bm25_idf(token)
             print(f"BM25 IDF score of '{args.term}': {bm25idf:.2f}")
         case "bm25tf":
-            bm25tf = bm25_tf_command(str(args.doc_id), args.term, args.k1)
+            bm25tf = bm25_tf_command(str(args.doc_id), args.term, args.k1, args.b)
             print(f"BM25 TF score of '{args.term}' in document '{args.doc_id}': {bm25tf:.2f}")
         case _:
             parser.print_help()
