@@ -4,7 +4,7 @@ from pickle import dump, load
 import os
 from collections import defaultdict, Counter
 from typing import Callable
-from cli.lib.search_utils import PROJECT_ROOT, tokenize_text_all, BM25_K1, BM25_B, tokenize_text, DEFAULT_SEARCH_LIMIT
+from cli.lib.search_utils import PROJECT_ROOT, tokenize_text_all, BM25_K1, BM25_B, DEFAULT_SEARCH_LIMIT
 from cli.lib.document import Document
 
 
@@ -63,7 +63,7 @@ class InvertedIndex:
         return self.get_bm25_idf(term) * self.get_bm25_tf(doc_id, term)
 
     def bm25_search(self, query: str, limit: int= DEFAULT_SEARCH_LIMIT):
-        query_tokens = tokenize_text(query)
+        query_tokens = tokenize_text_all(query)
         doc_scores = defaultdict(float)
         for doc_id in self.docmap.keys():
             doc_scores[doc_id] = sum(self.bm25(doc_id, query_token) for query_token in query_tokens)
