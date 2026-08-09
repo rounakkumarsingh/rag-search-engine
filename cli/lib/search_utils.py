@@ -14,7 +14,7 @@ STOPWORDS: list[str] = []
 def get_stopwords():
     if not STOPWORDS:
         with open(STOPWORDS_PATH, "r") as f:
-            STOPWORDS[:] = f.read().splitlines()
+            STOPWORDS[:] = [preprocess_text(word) for word in f.read().splitlines()]
     return STOPWORDS
 
 def preprocess_text(text: str) -> str:
