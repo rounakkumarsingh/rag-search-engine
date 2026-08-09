@@ -7,6 +7,8 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 STOPWORDS_PATH = os.path.join(PROJECT_ROOT, "data", "stopwords.txt")
 DEFAULT_SEARCH_LIMIT: Final = 5
 
+BM25_K1 = 1.5
+
 STOPWORDS: list[str] = []
 def get_stopwords():
     if not STOPWORDS:
