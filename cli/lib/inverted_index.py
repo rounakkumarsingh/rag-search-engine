@@ -1,9 +1,10 @@
+from itertools import islice
 import math
 from pickle import dump, load
 import os
 from collections import defaultdict, Counter
 from typing import Callable
-from cli.lib.search_utils import PROJECT_ROOT, tokenize_text_all, BM25_K1, BM25_B
+from cli.lib.search_utils import PROJECT_ROOT, tokenize_text_all, BM25_K1, BM25_B, tokenize_text, DEFAULT_SEARCH_LIMIT
 from cli.lib.document import Document
 
 
@@ -57,6 +58,17 @@ class InvertedIndex:
         tf = self.get_tf(doc_id, term)
         length_norm = 1 - b + b * (self.doc_lengths[doc_id] / self.__get_avg_doc_length())
         return (tf * (k1 + 1)) / (tf + k1 * length_norm)
+    
+    def bm25(self, doc_id: str, term: str) :
+        return self.get_bm25_idf(term) * self.get_bm25_tf(doc_id, term)
+
+    def bm25_search(self, query: str, limit: int= DEFAULT_SEARCH_LIMIT):
+        query_tokens = tokenize_text(query)
+        doc_scores = defaultdict(float)
+        for doc_id in self.docmap.keys():
+            doc_scores[doc_id] = sum(self.bm25(doc_id, query_token) for query_token in query_tokens)
+        doc_scores = dict(sorted(doc_scores.items(), key=lambda item: item[1], reverse=True))
+        return dict(islice(({self.docmap[doc_id]: score for doc_id, score in doc_scores.items() if doc_id in self.docmap}).items(), limit))
 
     def tfidf(self, doc_id, term: str) -> float:
         tf = self.get_tf(doc_id, term)
