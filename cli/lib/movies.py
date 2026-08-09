@@ -13,6 +13,12 @@ class MovieDocument:
     def get_id(self) -> str:
         return str(self._raw["id"])
 
+    def get_title(self) -> str:
+        return self._raw["title"]
+
+    def get_description(self) -> str:
+        return self._raw["description"]
+
     def to_text(self) -> str:
         return f"{self._raw['title']} {self._raw['description']}"
 

@@ -1,9 +1,8 @@
-from pickle import dump
+from pickle import dump, load
 import os
 from collections import defaultdict
 from typing import Callable
-from cli.lib.keyword_search import tokenize_text
-from cli.lib.search_utils import PROJECT_ROOT
+from cli.lib.search_utils import PROJECT_ROOT, tokenize_text
 from cli.lib.document import Document
 
 
@@ -38,5 +37,14 @@ class InvertedIndex:
             dump(self.index, f)
         with open(DOCMAP_CACHE_PATH, "wb") as f:
             dump(self.docmap, f)
+
+    def load(self):
+        cache_path = os.path.join(PROJECT_ROOT, "cache")
+        INDEX_CACHE_PATH = os.path.join(cache_path, "index.pkl")
+        DOCMAP_CACHE_PATH = os.path.join(cache_path, "docmap.pkl")
+        with open(INDEX_CACHE_PATH, "rb") as f:
+            self.index = load(f)
+        with open(DOCMAP_CACHE_PATH, "rb") as f:
+            self.docmap = load(f)
 
 
