@@ -24,6 +24,7 @@ def main() -> None:
     chunk_parser = subparsers.add_parser("chunk", help="Verify model loading")
     chunk_parser.add_argument("query", type=str, help="Text to embed")
     chunk_parser.add_argument("--chunk-size", type=int, nargs="?", default=200, help="Chunk size")
+    chunk_parser.add_argument("--overlap", type=int, nargs="?", default=0, help="Chunk size")
 
     args = parser.parse_args()
 
@@ -52,7 +53,7 @@ def main() -> None:
             print(f"Chunking {len(query)} characters")
             cnt = 0
             while cnt < len(words):
-                print(f"{(cnt + n)//n}. {" ".join(words[cnt: cnt + n])}")
+                print(f"{(cnt + n)//n}. {" ".join(words[max(0, cnt - args.overlap): cnt + n])}")
                 cnt += n
         case _:
             parser.print_help()
