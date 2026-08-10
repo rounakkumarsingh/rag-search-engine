@@ -13,7 +13,6 @@ def main() -> None:
     search_parser = subparsers.add_parser("search", help="Search movies using keywords")
     search_parser.add_argument("query", type=str, help="Search query")
 
-    build_parser = subparsers.add_parser("build", help="Build inverted index of documents")
 
     tf_parser = subparsers.add_parser("tf", help="Get term frequency for a document")
     tf_parser.add_argument("doc_id", type=str, help="Document ID")
