@@ -1,3 +1,4 @@
+import re
 from cli.lib.search_utils import DEFAULT_SEARCH_LIMIT
 from cli.lib.movies import MovieDocument, load_movies
 from cli.lib.semantic_search import SemanticSearch, embed_text, verify_embeddings, embed_query_text
@@ -25,6 +26,11 @@ def main() -> None:
     chunk_parser.add_argument("query", type=str, help="Text to embed")
     chunk_parser.add_argument("--chunk-size", type=int, nargs="?", default=200, help="Chunk size")
     chunk_parser.add_argument("--overlap", type=int, nargs="?", default=0, help="Chunk size")
+
+    semantic_chunk_parser = subparsers.add_parser("semantic_chunk", help="Verify model loading")
+    semantic_chunk_parser.add_argument("query", type=str, help="Text to embed")
+    semantic_chunk_parser.add_argument("--max-chunk-size", type=int, nargs="?", default=4, help="Chunk size")
+    semantic_chunk_parser.add_argument("--overlap", type=int, nargs="?", default=0, help="Chunk size")
 
     args = parser.parse_args()
 
@@ -55,6 +61,15 @@ def main() -> None:
             while cnt < len(words):
                 print(f"{(cnt + n)//n}. {" ".join(words[max(0, cnt - args.overlap): cnt + n])}")
                 cnt += n
+        case "semantic_chunk":
+            sentences = re.split(r"(?<=[.!?])\s+", args.query)
+            n = args.max_chunk_size
+            print(f"Semantically chunking {len(args.query)} characters")
+            cnt = 0
+            while cnt < len(sentences):
+                print(f"{(cnt + n)//n}. {" ".join(sentences[max(0, cnt - args.overlap): max(0,cnt - args.overlap) + n])}")
+                # print(f"{max(0, cnt - args.overlap), cnt + n}")
+                cnt = max(0, cnt-args.overlap) + n
         case _:
             parser.print_help()
 
