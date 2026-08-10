@@ -1,4 +1,5 @@
-from cli.lib.semantic_search import SemanticSearch, embed_text
+from cli.lib.movies import load_movies
+from cli.lib.semantic_search import SemanticSearch, embed_text, verify_embeddings
 import argparse
 
 
@@ -11,6 +12,7 @@ def main() -> None:
     embed_text_parser = subparsers.add_parser("embed_text", help="Embed text")
     embed_text_parser.add_argument("text", type=str, help="Text to embed")
 
+    verify_embeddings_parser = subparsers.add_parser("verify_embeddings", help="Verify model loading")
     args = parser.parse_args()
 
     match args.command:
@@ -19,6 +21,8 @@ def main() -> None:
             ss.verify()
         case "embed_text":
             embed_text(args.text)
+        case "verify_embeddings":
+            verify_embeddings(load_movies)
         case _:
             parser.print_help()
 
