@@ -51,6 +51,13 @@ def embed_text(text: str):
     print(f"First 3 dimensions: {embedding[:3]}")
     print(f"Dimensions: {embedding.shape[0]}")
 
+def embed_query_text(query: str):
+    ss = SemanticSearch()
+    embedding = ss.generate_embedding(query)
+    print(f"Text: {query}")
+    print(f"First 3 dimensions: {embedding[:3]}")
+    print(f"Shape: {embedding.shape}")
+
 def verify_embeddings(doc_loader: Callable[[], list[Document]]):
     documents = doc_loader()
     ss = SemanticSearch()
