@@ -20,6 +20,11 @@ def main() -> None:
     search_parser = subparsers.add_parser("search", help="Verify model loading")
     search_parser.add_argument("query", type=str, help="Text to embed")
     search_parser.add_argument("--limit", type=int, nargs="?", default=DEFAULT_SEARCH_LIMIT, help="Limit number of results")
+
+    chunk_parser = subparsers.add_parser("chunk", help="Verify model loading")
+    chunk_parser.add_argument("query", type=str, help="Text to embed")
+    chunk_parser.add_argument("--chunk-size", type=int, nargs="?", default=200, help="Chunk size")
+
     args = parser.parse_args()
 
     match args.command:
@@ -40,7 +45,15 @@ def main() -> None:
             for rank, (score, doc) in enumerate(result):
                 movie = doc
                 print(f"{rank + 1}. {movie.get_title()} (score: {score})\n {movie.get_description()}")
-            
+        case "chunk":
+            query = args.query
+            n = args.chunk_size
+            words = query.split()
+            print(f"Chunking {len(query)} characters")
+            cnt = 0
+            while cnt < len(words):
+                print(f"{(cnt + n)//n}. {" ".join(words[cnt: cnt + n])}")
+                cnt += n
         case _:
             parser.print_help()
 
