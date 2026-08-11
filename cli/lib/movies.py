@@ -22,6 +22,9 @@ class MovieDocument:
     def to_text(self) -> str:
         return f"{self._raw['title']} {self._raw['description']}"
 
+    def get_semantic_text(self) -> str:
+        return self._raw["description"]
+
 
 def load_movies() -> list[Document]:
     with open(DATA_PATH) as f:
