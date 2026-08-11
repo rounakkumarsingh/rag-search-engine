@@ -1,8 +1,7 @@
-import re
 from cli.lib.search_utils import DEFAULT_SEARCH_LIMIT
 from cli.lib.movies import MovieDocument, load_movies
 from cli.lib.semantic_search import SemanticSearch, embed_text, verify_embeddings, embed_query_text
-from cli.lib.chunked_semantic_search import ChunkedSemanticSearch
+from cli.lib.chunked_semantic_search import ChunkedSemanticSearch, semantic_chunks
 import argparse
 
 
@@ -78,14 +77,10 @@ def main() -> None:
                 print(f"{(cnt + n)//n}. {" ".join(words[max(0, cnt - args.overlap): cnt + n])}")
                 cnt += n
         case "semantic_chunk":
-            sentences = re.split(r"(?<=[.!?])\s+", args.query)
-            n = args.max_chunk_size
+            chunks = semantic_chunks(args.query, args.max_chunk_size, args.overlap)
             print(f"Semantically chunking {len(args.query)} characters")
-            cnt = 0
-            while cnt < len(sentences):
-                print(f"{(cnt + n)//n}. {" ".join(sentences[max(0, cnt - args.overlap): max(0,cnt - args.overlap) + n])}")
-                # print(f"{max(0, cnt - args.overlap), cnt + n}")
-                cnt = max(0, cnt-args.overlap) + n
+            for i, chunk in enumerate(chunks, start=1):
+                print(f"{i}. {chunk}")
         case "embed_chunks":
             chunked_search = ChunkedSemanticSearch(load_movies)
             embeddings = chunked_search.load_or_create_chunk_embeddings()
