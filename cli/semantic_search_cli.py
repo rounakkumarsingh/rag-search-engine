@@ -23,6 +23,10 @@ def main() -> None:
     search_parser.add_argument("query", type=str, help="Text to embed")
     search_parser.add_argument("--limit", type=int, nargs="?", default=DEFAULT_SEARCH_LIMIT, help="Limit number of results")
 
+    search_chunked_parser = subparsers.add_parser("search_chunked", help="Search using chunked embeddings")
+    search_chunked_parser.add_argument("query", type=str, help="Search query")
+    search_chunked_parser.add_argument("--limit", type=int, nargs="?", default=DEFAULT_SEARCH_LIMIT, help="Limit number of results")
+
     chunk_parser = subparsers.add_parser("chunk", help="Verify model loading")
     chunk_parser.add_argument("query", type=str, help="Text to embed")
     chunk_parser.add_argument("--chunk-size", type=int, nargs="?", default=200, help="Chunk size")
@@ -55,6 +59,15 @@ def main() -> None:
             for rank, (score, doc) in enumerate(result):
                 movie = doc
                 print(f"{rank + 1}. {movie.get_title()} (score: {score})\n {movie.get_description()}")
+        case "search_chunked":
+            query = args.query
+            chunked_search = ChunkedSemanticSearch(load_movies)
+            chunked_search.load_or_create_chunk_embeddings()
+            results = chunked_search.search(query, args.limit)
+            for i, (movie_idx, score) in enumerate(results, start=1):
+                movie = chunked_search.documents[movie_idx]
+                print(f"\n{i}. {movie.get_title()} (score: {score:.4f})")
+                print(f"   {movie.get_description()[:100]}...")
         case "chunk":
             query = args.query
             n = args.chunk_size
