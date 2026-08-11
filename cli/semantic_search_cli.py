@@ -2,6 +2,7 @@ import re
 from cli.lib.search_utils import DEFAULT_SEARCH_LIMIT
 from cli.lib.movies import MovieDocument, load_movies
 from cli.lib.semantic_search import SemanticSearch, embed_text, verify_embeddings, embed_query_text
+from cli.lib.chunked_semantic_search import ChunkedSemanticSearch
 import argparse
 
 
@@ -31,6 +32,8 @@ def main() -> None:
     semantic_chunk_parser.add_argument("query", type=str, help="Text to embed")
     semantic_chunk_parser.add_argument("--max-chunk-size", type=int, nargs="?", default=4, help="Chunk size")
     semantic_chunk_parser.add_argument("--overlap", type=int, nargs="?", default=0, help="Chunk size")
+
+    subparsers.add_parser("embed_chunks", help="Build chunked embeddings for all movies")
 
     args = parser.parse_args()
 
@@ -70,6 +73,10 @@ def main() -> None:
                 print(f"{(cnt + n)//n}. {" ".join(sentences[max(0, cnt - args.overlap): max(0,cnt - args.overlap) + n])}")
                 # print(f"{max(0, cnt - args.overlap), cnt + n}")
                 cnt = max(0, cnt-args.overlap) + n
+        case "embed_chunks":
+            chunked_search = ChunkedSemanticSearch(load_movies)
+            embeddings = chunked_search.load_or_create_chunk_embeddings()
+            print(f"Generated {len(embeddings)} chunked embeddings")
         case _:
             parser.print_help()
 
