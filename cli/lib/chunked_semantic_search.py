@@ -4,7 +4,7 @@ import re
 import numpy
 from cli.lib.document import Document
 from typing import Callable
-from cli.lib.semantic_search import SemanticSearch
+from cli.lib.semantic_search import SemanticSearch, cosine_similarity
 from typing import TypedDict
 
 
@@ -16,7 +16,7 @@ class ChunkMetadata(TypedDict):
 class ChunkedSemanticSearch(SemanticSearch):
     def __init__(self, loader: Callable[[], list[Document]]):
         super().__init__(loader)
-        self.chunk_embeddings = None
+        self.chunk_embeddings: numpy.ndarray | None = None
         self.chunk_metadata: list[ChunkMetadata] = []
 
     def build_chunk_embeddings(self)-> numpy.ndarray:
@@ -59,3 +59,21 @@ class ChunkedSemanticSearch(SemanticSearch):
                 self.chunk_metadata = json.load(f)["chunks"]
             return self.chunk_embeddings
         return self.build_chunk_embeddings()
+
+    def search(self, query: str, limit = 10):
+        if self.chunk_embeddings is None:
+            raise ValueError("No chunk embeddings loaded. Call `load_or_create_chunk_embeddings` first.")
+        query_embedding = self.generate_embedding(query)
+        scores: list[dict] = []
+        for chunk_idx in range(len(self.chunk_embeddings)):
+            similarity_score = cosine_similarity(query_embedding, self.chunk_embeddings[chunk_idx])
+            scores.append({"chunk_idx": chunk_idx, "movie_idx": self.chunk_metadata[chunk_idx].get("document_idx"), "score": similarity_score})
+        movies_best_scores:dict[Document, float] = {}
+        for chunk_score in scores:
+            if chunk_score["movie_idx"] in movies_best_scores:
+                if chunk_score["score"] > movies_best_scores[chunk_score["movie_idx"]]:
+                    movies_best_scores[chunk_score["movie_idx"]] = chunk_score["score"]
+            else:
+                movies_best_scores[chunk_score["movie_idx"]] = chunk_score["score"]
+
+        return (sorted(movies_best_scores.items(), key=lambda item: item[1], reverse=True)[:limit])
