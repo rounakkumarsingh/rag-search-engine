@@ -8,6 +8,27 @@ from cli.lib.semantic_search import SemanticSearch, cosine_similarity
 from typing import TypedDict
 
 
+def semantic_chunks(text: str, max_chunk_size: int = 4, overlap: int = 1) -> list[str]:
+    stripped = text.strip()
+    if not stripped:
+        return []
+
+    sentences = re.split(r"(?<=[.!?])\s+", stripped)
+    if len(sentences) == 1 and not sentences[0].rstrip().endswith((".", "!", "?")):
+        sentences = [stripped]
+
+    sentences = [s.strip() for s in sentences]
+    chunks: list[str] = []
+    cnt = 0
+    while cnt < len(sentences):
+        start = max(0, cnt - overlap)
+        chunk = " ".join(sentences[start: start + max_chunk_size]).strip()
+        if chunk:
+            chunks.append(chunk)
+        cnt = start + max_chunk_size
+    return chunks
+
+
 class ChunkMetadata(TypedDict):
     document_idx: int
     chunk_idx: int
@@ -25,20 +46,13 @@ class ChunkedSemanticSearch(SemanticSearch):
             self.document_map[document.get_id()] = document
         chunks:list[str] = []
         for document_idx, document in enumerate(self.documents):
-            if not document.get_semantic_text():
+            if not document.get_semantic_text().strip():
                 continue
-            sentences = re.split(r"(?<=[.!?])\s+", document.get_semantic_text())
-            MAX_CHUNK_SIZE = 4
-            OVERLAP = 1
-            cnt = 0
             doc_start = len(chunks)
-            while cnt < len(sentences):
-                chunks.append(" ".join(sentences[max(0, cnt - OVERLAP): max(0,cnt - OVERLAP) + MAX_CHUNK_SIZE]))
-                cnt  = max(0,cnt - OVERLAP) + MAX_CHUNK_SIZE
+            chunks.extend(semantic_chunks(document.get_semantic_text()))
             doc_total_chunks = len(chunks) - doc_start
             for chunk_idx in range(doc_start, len(chunks)):
                 self.chunk_metadata.append({"chunk_idx": chunk_idx, "document_idx": document_idx, "total_chunks": doc_total_chunks})
-
         self.chunk_embeddings = numpy.asarray(self.model.encode(chunks, show_progress_bar=True))
         CHUNK_EMBEDDINGS_CACHE_PATH = PROJECT_ROOT / "cache" / "chunk_embeddings.npy"
         numpy.save(CHUNK_EMBEDDINGS_CACHE_PATH, self.chunk_embeddings)
