@@ -2,13 +2,16 @@ import re
 
 import numpy
 
-from cli.lib.caches import load_json, load_numpy, load_numpy_if_valid, save_json, save_numpy, source_fingerprint
-from cli.lib.config import CHUNK_EMBEDDINGS_CACHE_PATH, CHUNK_METADATA_CACHE_PATH, DATA_PATH, EMBEDDING_MODEL
+import json
+from typing import Callable, TypedDict
+
+from cli.lib.caches import load_json, load_numpy_if_valid, save_json, save_numpy, source_fingerprint
+from cli.lib.config import CHUNK_EMBEDDINGS_CACHE_PATH, CHUNK_METADATA_CACHE_PATH, EMBEDDING_MODEL
 from cli.lib.document import Document
 from cli.lib.models import get_embedder
 from cli.lib.search_utils import DEFAULT_SEARCH_LIMIT
 from cli.lib.semantic_search import SemanticSearch
-from typing import Callable, TypedDict
+from cli.lib.exceptions import CacheInvalidError, EmptyQueryError
 
 
 def semantic_chunks(text: str, max_chunk_size: int = 4, overlap: int = 1) -> list[str]:
@@ -81,7 +84,13 @@ class ChunkedSemanticSearch(SemanticSearch):
 
     def load_or_create_chunk_embeddings(self) -> numpy.ndarray:
         self._load_documents()
-        metadata_payload = load_json(CHUNK_METADATA_CACHE_PATH) if CHUNK_METADATA_CACHE_PATH.exists() else None
+        if CHUNK_METADATA_CACHE_PATH.exists():
+            try:
+                metadata_payload = load_json(CHUNK_METADATA_CACHE_PATH)
+            except json.JSONDecodeError as exc:
+                raise CacheInvalidError("Chunk metadata cache is unreadable") from exc
+        else:
+            metadata_payload = None
         if metadata_payload is not None:
             cached = load_numpy_if_valid(CHUNK_EMBEDDINGS_CACHE_PATH, expected_rows=metadata_payload.get("total_chunks"))
             metadata = metadata_payload.get("chunks")
@@ -94,6 +103,8 @@ class ChunkedSemanticSearch(SemanticSearch):
         return self.build_chunk_embeddings()
 
     def search(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[tuple[float, Document]]:
+        if not query.strip():
+            raise EmptyQueryError("Query is empty")
         if self.chunk_embeddings is None:
             raise ValueError("No chunk embeddings loaded. Call `load_or_create_chunk_embeddings` first.")
         query_embedding = self.generate_embedding(query)
@@ -112,7 +123,7 @@ class ChunkedSemanticSearch(SemanticSearch):
             score = float(similarities[chunk_idx])
             doc_id = metadata.get("document_id")
             if doc_id is not None:
-                doc_pos = self.document_positions[doc_id]
+                doc_pos = self.document_positions.get(doc_id, metadata["document_idx"])
             else:
                 doc_pos = metadata["document_idx"]
             if score > movies_best_scores.get(doc_pos, -1.0):

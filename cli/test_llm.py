@@ -1,10 +1,13 @@
 import os
 
+from dotenv import load_dotenv
+
 from cli.lib.config import LLM_API_KEY_ENV, LLM_DEFAULT_MODEL
 from cli.lib.llm import create_openai_client
 
 
 def main() -> None:
+    load_dotenv()
     if not os.environ.get(LLM_API_KEY_ENV):
         raise RuntimeError(f"{LLM_API_KEY_ENV} environment variable not set; set it to use LLM features")
 
