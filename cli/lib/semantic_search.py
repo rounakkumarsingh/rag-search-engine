@@ -1,7 +1,8 @@
 from cli.lib.search_utils import DEFAULT_SEARCH_LIMIT
 from typing import Callable
 import os
-from cli.lib.movies import PROJECT_ROOT, load_movies
+from cli.lib.config import EMBEDDINGS_CACHE_PATH, EMBEDDING_MODEL
+from cli.lib.movies import load_movies
 from cli.lib.document import Document
 from sentence_transformers import SentenceTransformer
 import numpy as np
@@ -27,16 +28,15 @@ class SemanticSearch():
             self.document_map[document.get_id()] = document
             doc_strings.append(document.to_text())
         self.embeddings = self.model.encode(doc_strings, show_progress_bar=True)
-        EMBEDDING_CACHE_PATH = PROJECT_ROOT / "cache" / "embeddings.npy"
-        np.save(EMBEDDING_CACHE_PATH, self.embeddings)
+        np.save(EMBEDDINGS_CACHE_PATH, self.embeddings)
         return self.embeddings
 
     def load_or_create_embeddings(self):
         self.documents = self.doc_loader()
         for document in self.documents:
             self.document_map[document.get_id()] = document
-        if (os.path.exists(PROJECT_ROOT / "cache" / "embeddings.npy")):
-            self.embeddings = np.load(PROJECT_ROOT / "cache" / "embeddings.npy")
+        if (os.path.exists(EMBEDDINGS_CACHE_PATH)):
+            self.embeddings = np.load(EMBEDDINGS_CACHE_PATH)
             if (self.embeddings.shape[0] == len(self.documents)):
                 return self.embeddings
         return self.build_embeddings()

@@ -1,10 +1,15 @@
 from itertools import islice
 import math
 from pickle import dump, load
-import os
 from collections import defaultdict, Counter
 from typing import Callable
-from cli.lib.search_utils import PROJECT_ROOT, tokenize_text_all, BM25_K1, BM25_B, DEFAULT_SEARCH_LIMIT
+from cli.lib.config import (
+    DOC_LENGTHS_CACHE_PATH,
+    DOCMAP_CACHE_PATH,
+    INDEX_CACHE_PATH,
+    TERM_FREQUENCIES_CACHE_PATH,
+)
+from cli.lib.search_utils import tokenize_text_all, BM25_K1, BM25_B, DEFAULT_SEARCH_LIMIT
 from cli.lib.document import Document
 
 
@@ -76,35 +81,25 @@ class InvertedIndex:
         return tf * idf
 
     def save(self):
-        cache_path = os.path.join(PROJECT_ROOT, "cache")
-        if not os.path.isdir(cache_path):
-            os.makedirs(cache_path)
-        INDEX_CACHE_PATH = os.path.join(cache_path, "index.pkl")
-        DOCMAP_CACHE_PATH = os.path.join(cache_path, "docmap.pkl")
-        TERM_FREQ_CACHE_PATH = os.path.join(cache_path, "term_frequencies.pkl")
-        DOC_LENGTH_CACHE_PATH = os.path.join(cache_path, "doc_lengths.pkl")
+        if not DOC_LENGTHS_CACHE_PATH.parent.is_dir():
+            DOC_LENGTHS_CACHE_PATH.parent.mkdir(parents=True)
         with open(INDEX_CACHE_PATH, "wb") as f:
             dump(self.index, f)
         with open(DOCMAP_CACHE_PATH, "wb") as f:
             dump(self.docmap, f)
-        with open(TERM_FREQ_CACHE_PATH, "wb") as f:
+        with open(TERM_FREQUENCIES_CACHE_PATH, "wb") as f:
             dump(self.term_frequencies, f)
-        with open(DOC_LENGTH_CACHE_PATH, "wb") as f:
+        with open(DOC_LENGTHS_CACHE_PATH, "wb") as f:
             dump(self.doc_lengths, f)
 
     def load(self):
-        cache_path = os.path.join(PROJECT_ROOT, "cache")
-        INDEX_CACHE_PATH = os.path.join(cache_path, "index.pkl")
-        DOCMAP_CACHE_PATH = os.path.join(cache_path, "docmap.pkl")
-        TERM_FREQ_CACHE_PATH = os.path.join(cache_path, "term_frequencies.pkl")
-        DOC_LENGTH_CACHE_PATH = os.path.join(cache_path, "doc_lengths.pkl")
         with open(INDEX_CACHE_PATH, "rb") as f:
             self.index = load(f)
         with open(DOCMAP_CACHE_PATH, "rb") as f:
             self.docmap = load(f)
-        with open(TERM_FREQ_CACHE_PATH, "rb") as f:
+        with open(TERM_FREQUENCIES_CACHE_PATH, "rb") as f:
             self.term_frequencies = load(f)
-        with open(DOC_LENGTH_CACHE_PATH, "rb") as f:
+        with open(DOC_LENGTHS_CACHE_PATH, "rb") as f:
             self.doc_lengths = load(f)
 
 

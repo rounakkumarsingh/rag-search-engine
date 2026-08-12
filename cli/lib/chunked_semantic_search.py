@@ -1,5 +1,5 @@
 import json
-from cli.lib.movies import PROJECT_ROOT
+from cli.lib.config import CHUNK_EMBEDDINGS_CACHE_PATH, CHUNK_METADATA_CACHE_PATH
 import re
 import numpy
 from cli.lib.document import Document
@@ -54,9 +54,7 @@ class ChunkedSemanticSearch(SemanticSearch):
             for chunk_idx in range(doc_start, len(chunks)):
                 self.chunk_metadata.append({"chunk_idx": chunk_idx, "document_idx": document_idx, "total_chunks": doc_total_chunks})
         self.chunk_embeddings = numpy.asarray(self.model.encode(chunks, show_progress_bar=True))
-        CHUNK_EMBEDDINGS_CACHE_PATH = PROJECT_ROOT / "cache" / "chunk_embeddings.npy"
         numpy.save(CHUNK_EMBEDDINGS_CACHE_PATH, self.chunk_embeddings)
-        CHUNK_METADATA_CACHE_PATH = PROJECT_ROOT / "cache" / "chunk_metadata.json"
         with open(CHUNK_METADATA_CACHE_PATH, "w") as f:
             json.dump({"chunks": self.chunk_metadata, "total_chunks": len(chunks)}, f, indent=2)
         return self.chunk_embeddings
@@ -65,8 +63,6 @@ class ChunkedSemanticSearch(SemanticSearch):
         self.documents = self.doc_loader()
         for document in self.documents:
             self.document_map[document.get_id()] = document
-        CHUNK_EMBEDDINGS_CACHE_PATH = PROJECT_ROOT / "cache" / "chunk_embeddings.npy"
-        CHUNK_METADATA_CACHE_PATH = PROJECT_ROOT / "cache" / "chunk_metadata.json"
         if CHUNK_EMBEDDINGS_CACHE_PATH.exists() and CHUNK_METADATA_CACHE_PATH.exists():
             self.chunk_embeddings = numpy.load(CHUNK_EMBEDDINGS_CACHE_PATH)
             with open(CHUNK_METADATA_CACHE_PATH) as f:
