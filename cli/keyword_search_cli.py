@@ -2,9 +2,18 @@ import argparse
 import sys
 
 from cli.lib.inverted_index import InvertedIndex
-from cli.lib.keyword_search import search_command, bm25_tf_command, bm25_search_command
+from cli.lib.keyword_search import bm25_search_command, bm25_tf_command, search_command
 from cli.lib.movies import load_movies
-from cli.lib.search_utils import tokenize_single_term, BM25_K1, BM25_B
+from cli.lib.search_utils import DEFAULT_SEARCH_LIMIT, BM25_K1, BM25_B, tokenize_single_term
+
+
+def load_index() -> InvertedIndex:
+    try:
+        return InvertedIndex.load_or_build(load_movies)
+    except Exception as exc:
+        print(f"Failed to load or build index: {exc}", file=sys.stderr)
+        sys.exit(1)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -12,7 +21,6 @@ def main() -> None:
 
     search_parser = subparsers.add_parser("search", help="Search movies using keywords")
     search_parser.add_argument("query", type=str, help="Search query")
-
 
     tf_parser = subparsers.add_parser("tf", help="Get term frequency for a document")
     tf_parser.add_argument("doc_id", type=str, help="Document ID")
@@ -36,7 +44,7 @@ def main() -> None:
 
     bm25search_parser = subparsers.add_parser("bm25search", help="Search movies using full BM25 scoring")
     bm25search_parser.add_argument("query", type=str, help="Search query")
-    bm25search_parser.add_argument("--limit", type=int, default=5, help="Maximum number of results (default: 5)")
+    bm25search_parser.add_argument("--limit", type=int, default=DEFAULT_SEARCH_LIMIT, help="Maximum number of results (default: 5)")
 
     args = parser.parse_args()
 
@@ -51,43 +59,19 @@ def main() -> None:
             ii.build()
             ii.save()
         case "tf":
-            ii = InvertedIndex(load_movies)
-            try:
-                ii.load()
-            except Exception:
-                print("Index not found. Please build index first.")
-                sys.exit(1)
             token = tokenize_single_term(args.term)
-            print(ii.get_tf(args.doc_id, token))
+            print(load_index().get_tf(args.doc_id, token))
         case "idf":
-            ii = InvertedIndex(load_movies)
-            try:
-                ii.load()
-            except Exception:
-                print("Index not found. Please build index first.")
-                sys.exit(1)
             token = tokenize_single_term(args.term)
-            idf = ii.idf(token)
+            idf = load_index().idf(token)
             print(f"Inverse document frequency of '{args.term}': {idf:.2f}")
         case "tfidf":
-            ii = InvertedIndex(load_movies)
-            try:
-                ii.load()
-            except Exception:
-                print("Index not found. Please build index first.")
-                sys.exit(1)
             token = tokenize_single_term(args.term)
-            tf_idf = ii.tfidf(args.doc_id, token)
+            tf_idf = load_index().tfidf(args.doc_id, token)
             print(f"TF-IDF score of '{args.term}' in document '{args.doc_id}': {tf_idf:.2f}")
         case "bm25idf":
-            ii = InvertedIndex(load_movies)
-            try:
-                ii.load()
-            except Exception:
-                print("Index not found. Please build index first.")
-                sys.exit(1)
             token = tokenize_single_term(args.term)
-            bm25idf = ii.get_bm25_idf(token)
+            bm25idf = load_index().get_bm25_idf(token)
             print(f"BM25 IDF score of '{args.term}': {bm25idf:.2f}")
         case "bm25tf":
             bm25tf = bm25_tf_command(str(args.doc_id), args.term, args.k1, args.b)
