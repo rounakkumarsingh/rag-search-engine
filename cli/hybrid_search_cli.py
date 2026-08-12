@@ -2,6 +2,7 @@ from cli.lib.llm import LLMWrapper
 from cli.lib.movies import load_movies
 from cli.lib.hybrid_search import HybridSearch, normalize
 import argparse
+import json
 import time
 
 
@@ -31,7 +32,7 @@ def main() -> None:
         "--rerank-method",
         type=str,
         default="individual",
-        choices=["individual"],
+        choices=["individual", "batch"],
         help="Result reranking method (default: individual)",
     )
 
@@ -105,9 +106,8 @@ User query: "{args.query}"
                 print(f"Enhanced query ({args.enhance}): '{args.query}' -> '{response}'\n")
                 args.query = response
 
-            if (args.rerank_method == "individual"):
-                args.limit *= 5
-            results = hs.rrf_search(args.query, args.k, args.limit)
+            rr_limit = args.limit * 5 if args.rerank_method in ["individual", "batch"] else args.limit
+            results = hs.rrf_search(args.query, args.k, rr_limit)
 
             if args.rerank_method == "individual":
                 print(f"Re-ranking top {len(results)} results using individual method...")
@@ -134,14 +134,57 @@ Score:"""
                     ranks["rr_score"] = rr_score
                     time.sleep(3)
 
-            if args.rerank_method == "individual":
                 results.sort(key=lambda item: item[0]["rr_score"], reverse=True)
                 results = results[:args.limit]
+
+            elif args.rerank_method == "batch":
+                print(f"Re-ranking top {len(results)} results using batch method...")
+                doc_list_str = "\n".join(
+                    f"{doc.get_id()}: {doc.get_title()} - {doc.get_description()}"
+                    for _, doc in results
+                )
+                PROMPT = f"""Rank the movies listed below by relevance to the following search query.
+
+Query: "{args.query}"
+
+Movies:
+{doc_list_str}
+
+Return the movie IDs in order of relevance, best match first.
+
+Your response must be a raw JSON array of integers.
+Do not wrap the JSON in Markdown. Do not use a ```json code block.
+Do not include any explanatory text.
+
+For example:
+[75, 12, 34, 2, 1]
+
+Ranking:"""
+                response = llm.generate(PROMPT)
+                try:
+                    ranked_ids = json.loads(response.strip())
+                except json.JSONDecodeError:
+                    ranked_ids = []
+
+                docs_by_id = {doc.get_id(): doc for _, doc in results}
+                ranks_by_id = {doc.get_id(): ranks for ranks, doc in results}
+                ranked_results: list[tuple[dict, Document]] = []
+                for new_rank, doc_id in enumerate(ranked_ids):
+                    doc = docs_by_id.get(str(doc_id))
+                    if doc is None:
+                        continue
+                    ranks = ranks_by_id[doc.get_id()]
+                    ranks["rr_rank"] = new_rank + 1
+                    ranked_results.append((ranks, doc))
+
+                results = ranked_results[:args.limit]
 
             for idx, (ranks, doc) in enumerate(results, start=1):
                 print(f"{idx}. {doc.get_title()}")
                 if args.rerank_method == "individual":
                     print(f"  Re-rank Score: {ranks['rr_score']:.3f}/10")
+                elif args.rerank_method == "batch":
+                    print(f"  Re-rank Rank: {ranks['rr_rank']}")
                 print(f"  RRF Score: {ranks['rrf_score']:.3f}")
                 print(f"  BM25 Rank: {ranks['bm25_rank'] or 0}, Semantic Rank: {ranks['semantic_rank'] or 0}")
                 print(f"  {doc.get_description()[:100]}")
