@@ -63,8 +63,7 @@ def main() -> None:
             chunked_search = ChunkedSemanticSearch(load_movies)
             chunked_search.load_or_create_chunk_embeddings()
             results = chunked_search.search(query, args.limit)
-            for i, (movie_idx, score) in enumerate(results, start=1):
-                movie = chunked_search.documents[movie_idx]
+            for i, (score, movie) in enumerate(results, start=1):
                 print(f"\n{i}. {movie.get_title()} (score: {score:.4f})")
                 print(f"   {movie.get_description()[:100]}...")
         case "chunk":
