@@ -1,4 +1,4 @@
-import json
+from cli.lib.caches import load_json, load_numpy, save_json, save_numpy
 from cli.lib.config import CHUNK_EMBEDDINGS_CACHE_PATH, CHUNK_METADATA_CACHE_PATH
 import re
 import numpy
@@ -41,9 +41,7 @@ class ChunkedSemanticSearch(SemanticSearch):
         self.chunk_metadata: list[ChunkMetadata] = []
 
     def build_chunk_embeddings(self)-> numpy.ndarray:
-        self.documents = self.doc_loader()
-        for document in self.documents:
-            self.document_map[document.get_id()] = document
+        self._load_documents()
         chunks:list[str] = []
         for document_idx, document in enumerate(self.documents):
             if not document.get_semantic_text().strip():
@@ -54,20 +52,19 @@ class ChunkedSemanticSearch(SemanticSearch):
             for chunk_idx in range(doc_start, len(chunks)):
                 self.chunk_metadata.append({"chunk_idx": chunk_idx, "document_idx": document_idx, "total_chunks": doc_total_chunks})
         self.chunk_embeddings = numpy.asarray(self.model.encode(chunks, show_progress_bar=True))
-        numpy.save(CHUNK_EMBEDDINGS_CACHE_PATH, self.chunk_embeddings)
-        with open(CHUNK_METADATA_CACHE_PATH, "w") as f:
-            json.dump({"chunks": self.chunk_metadata, "total_chunks": len(chunks)}, f, indent=2)
+        save_numpy(CHUNK_EMBEDDINGS_CACHE_PATH, self.chunk_embeddings)
+        save_json(CHUNK_METADATA_CACHE_PATH, {"chunks": self.chunk_metadata, "total_chunks": len(chunks)})
         return self.chunk_embeddings
 
     def load_or_create_chunk_embeddings(self) -> numpy.ndarray:
-        self.documents = self.doc_loader()
-        for document in self.documents:
-            self.document_map[document.get_id()] = document
+        self._load_documents()
         if CHUNK_EMBEDDINGS_CACHE_PATH.exists() and CHUNK_METADATA_CACHE_PATH.exists():
-            self.chunk_embeddings = numpy.load(CHUNK_EMBEDDINGS_CACHE_PATH)
-            with open(CHUNK_METADATA_CACHE_PATH) as f:
-                self.chunk_metadata = json.load(f)["chunks"]
-            return self.chunk_embeddings
+            embeddings = load_numpy(CHUNK_EMBEDDINGS_CACHE_PATH)
+            metadata = load_json(CHUNK_METADATA_CACHE_PATH)["chunks"]
+            if len(embeddings) == len(metadata):
+                self.chunk_embeddings = embeddings
+                self.chunk_metadata = metadata
+                return self.chunk_embeddings
         return self.build_chunk_embeddings()
 
     def search(self, query: str, limit = 10):
