@@ -23,7 +23,7 @@ def main() -> None:
     rrf_search_parser.add_argument(
         "--enhance",
         type=str,
-        choices=["spell", "rewrite"],
+        choices=["spell", "rewrite", "expand"],
         help="Query enhancement method",
     )
 
@@ -43,7 +43,7 @@ def main() -> None:
                 print(f"  {doc.get_description()[:100]}")
         case "rrf-search":
             hs = HybridSearch(load_movies)
-            llm = LLMWrapper()
+            llm = LLMWrapper("google/gemma-4-26b-a4b-it:free")
             if (args.enhance == "spell"):
                 PROMPT = f"""Fix any spelling errors in the user-provided movie search query below.
 Correct only clear, high-confidence typos. Do not rewrite, add, remove, or reorder words.
@@ -76,6 +76,23 @@ Output only the rewritten query text, nothing else.
 
 User query: "{args.query}"
 """            
+                response = llm.generate(PROMPT)
+                print(f"Enhanced query ({args.enhance}): '{args.query}' -> '{response}'\n")
+                args.query = response
+            elif (args.enhance == "expand"):
+                PROMPT = f"""Expand the user-provided movie search query below with related terms.
+
+Add synonyms and related concepts that might appear in movie descriptions.
+Keep expansions relevant and focused.
+Output only the additional terms; they will be appended to the original query.
+
+Examples:
+- "scary bear movie" -> "scary horror grizzly bear movie terrifying film"
+- "action movie with bear" -> "action thriller bear chase fight adventure"
+- "comedy with bear" -> "comedy funny bear humor lighthearted"
+
+User query: "{args.query}"
+"""
                 response = llm.generate(PROMPT)
                 print(f"Enhanced query ({args.enhance}): '{args.query}' -> '{response}'\n")
                 args.query = response
