@@ -50,32 +50,12 @@ class SemanticSearch():
         scores.sort(key=lambda x: x[0], reverse=True)
         return scores[:limit]
 
-    def verify(self):
-        print(f"Model loaded: {self.model}")
-        print(f"Max sequence length: {self.model.max_seq_length}")
+    def verify(self) -> str:
+        return (
+            f"Model loaded: {self.model}\n"
+            f"Max sequence length: {self.model.max_seq_length}"
+        )
 
-
-def embed_text(text: str):
-    ss = SemanticSearch(lambda: [])
-    embedding = ss.generate_embedding(text)
-    print(f"Text: {text}")
-    print(f"First 3 dimensions: {embedding[:3]}")
-    print(f"Dimensions: {embedding.shape[0]}")
-
-def embed_query_text(query: str):
-    ss = SemanticSearch(lambda: [])
-    embedding = ss.generate_embedding(query)
-    print(f"Text: {query}")
-    print(f"First 3 dimensions: {embedding[:3]}")
-    print(f"Shape: {embedding.shape}")
-
-def verify_embeddings(doc_loader: Callable[[], list[Document]]):
-    ss = SemanticSearch(doc_loader)
-    embeddings = ss.load_or_create_embeddings()
-    print(f"Number of docs:   {len(ss.documents)}")
-    print(
-        f"Embeddings shape: {embeddings.shape[0]} vectors in {embeddings.shape[1]} dimensions"
-    )
 
 def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
     dot_product = np.dot(vec1, vec2)
