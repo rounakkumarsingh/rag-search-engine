@@ -1,7 +1,9 @@
+from dataclasses import replace
 from sentence_transformers import CrossEncoder
 from cli.lib.llm import LLMWrapper
 from cli.lib.movies import load_movies
-from cli.lib.hybrid_search import HybridSearch, normalize
+from cli.lib.hybrid_search import HybridSearch
+from cli.lib.ranking import normalize
 import argparse
 import json
 import time
@@ -33,7 +35,7 @@ def main() -> None:
         "--rerank-method",
         type=str,
         default="individual",
-        choices=["individual", "batch", "cross_encoder"],
+        choices=["individual", "batch", "cross_encoder", "none"],
         help="Result reranking method (default: individual)",
     )
 
@@ -46,11 +48,11 @@ def main() -> None:
         case "weighted-search":
             hs = HybridSearch(load_movies)
             results = hs.weighted_search(args.query, args.alpha, args.limit)
-            for idx, (scores, doc) in enumerate(results, start=1):
-                print(f"{idx}. {doc.get_title()}")
-                print(f"  Hybrid Score: {scores['hybrid_score']:.3f}")
-                print(f"  BM25 Rank: {scores['bm25_score'] or 0}, Semantic Rank: {scores['semantic_score'] or 0}")
-                print(f"  {doc.get_description()[:100]}")
+            for idx, result in enumerate(results, start=1):
+                print(f"{idx}. {result.document.get_title()}")
+                print(f"  Hybrid Score: {result.hybrid_score:.3f}")
+                print(f"  BM25 Score: {result.bm25_score:.3f}, Semantic Score: {result.semantic_score:.3f}")
+                print(f"  {result.document.get_description()[:100]}")
         case "rrf-search":
             hs = HybridSearch(load_movies)
             llm = LLMWrapper("google/gemma-4-26b-a4b-it:free")
@@ -107,16 +109,17 @@ User query: "{args.query}"
                 print(f"Enhanced query ({args.enhance}): '{args.query}' -> '{response}'\n")
                 args.query = response
 
-            rr_limit = args.limit * 5 if args.rerank_method else args.limit
+            rr_limit = args.limit * 5 if args.rerank_method != "none" else args.limit
             results = hs.rrf_search(args.query, args.k, rr_limit)
 
             if args.rerank_method == "individual":
                 print(f"Re-ranking top {len(results)} results using individual method...")
-                for i, (ranks, doc) in enumerate(results):
+                reranked: list = []
+                for result in results:
                     PROMPT = f"""Rate how well this movie matches the search query.
 
 Query: "{args.query}"
-Movie: {doc.get_title()} - {doc.get_description()}
+Movie: {result.document.get_title()} - {result.document.get_description()}
 
 Consider:
 - Direct relevance to query
@@ -129,20 +132,20 @@ Output ONLY the number in your response, no other text or explanation.
 Score:"""
                     response = llm.generate(PROMPT)
                     try:
-                        rr_score = float(response.strip())
+                        rerank_score = float(response.strip())
                     except ValueError:
-                        rr_score = 0.0
-                    ranks["rr_score"] = rr_score
+                        rerank_score = 0.0
+                    reranked.append(replace(result, rr_score=rerank_score))
                     time.sleep(3)
 
-                results.sort(key=lambda item: item[0]["rr_score"], reverse=True)
-                results = results[:args.limit]
+                reranked.sort(key=lambda item: item.rr_score, reverse=True)
+                results = reranked[:args.limit]
 
             elif args.rerank_method == "batch":
                 print(f"Re-ranking top {len(results)} results using batch method...")
                 doc_list_str = "\n".join(
-                    f"{doc.get_id()}: {doc.get_title()} - {doc.get_description()}"
-                    for _, doc in results
+                    f"{result.document.get_id()}: {result.document.get_title()} - {result.document.get_description()}"
+                    for result in results
                 )
                 PROMPT = f"""Rank the movies listed below by relevance to the following search query.
 
@@ -167,41 +170,39 @@ Ranking:"""
                 except json.JSONDecodeError:
                     ranked_ids = []
 
-                docs_by_id = {doc.get_id(): doc for _, doc in results}
-                ranks_by_id = {doc.get_id(): ranks for ranks, doc in results}
-                ranked_results: list[tuple[dict, Document]] = []
+                docs_by_id = {result.document.get_id(): result for result in results}
+                ranked_results: list = []
                 for new_rank, doc_id in enumerate(ranked_ids):
-                    doc = docs_by_id.get(str(doc_id))
-                    if doc is None:
+                    result = docs_by_id.get(str(doc_id))
+                    if result is None:
                         continue
-                    ranks = ranks_by_id[doc.get_id()]
-                    ranks["rr_rank"] = new_rank + 1
-                    ranked_results.append((ranks, doc))
+                    ranked_results.append(replace(result, rr_rank=new_rank + 1))
 
                 results = ranked_results[:args.limit]
 
             elif args.rerank_method == "cross_encoder":
                 pairs: list[list[str]] = []
-                for _, doc in results:
-                    pairs.append([args.query, doc.to_text()])
+                for result in results:
+                    pairs.append([args.query, result.document.to_text()])
                 cross_encoder = CrossEncoder("cross-encoder/ms-marco-TinyBERT-L2-v2")
                 scores = cross_encoder.predict(pairs)
-                for (ranks, doc), score in zip(results, scores):
-                    ranks["rr_score"] = float(score)
-                results.sort(key=lambda item: item[0]["rr_score"], reverse=True)
-                results = results[:args.limit]
+                reranked: list = []
+                for result, score in zip(results, scores):
+                    reranked.append(replace(result, rr_score=float(score)))
+                reranked.sort(key=lambda item: item.rr_score, reverse=True)
+                results = reranked[:args.limit]
 
-            for idx, (ranks, doc) in enumerate(results, start=1):
-                print(f"{idx}. {doc.get_title()}")
+            for idx, result in enumerate(results, start=1):
+                print(f"{idx}. {result.document.get_title()}")
                 if args.rerank_method == "individual":
-                    print(f"  Re-rank Score: {ranks['rr_score']:.3f}/10")
+                    print(f"  Re-rank Score: {result.rr_score:.3f}/10")
                 elif args.rerank_method == "batch":
-                    print(f"  Re-rank Rank: {ranks['rr_rank']}")
+                    print(f"  Re-rank Rank: {result.rr_rank}")
                 elif args.rerank_method == "cross_encoder":
-                    print(f"  Re-rank Score: {ranks['rr_score']:.3f}")
-                print(f"  RRF Score: {ranks['rrf_score']:.3f}")
-                print(f"  BM25 Rank: {ranks['bm25_rank'] or 0}, Semantic Rank: {ranks['semantic_rank'] or 0}")
-                print(f"  {doc.get_description()[:100]}")
+                    print(f"  Re-rank Score: {result.rr_score:.3f}")
+                print(f"  RRF Score: {result.rrf_score:.3f}")
+                print(f"  BM25 Rank: {result.bm25_rank or 0}, Semantic Rank: {result.semantic_rank or 0}")
+                print(f"  {result.document.get_description()[:100]}")
         case _:
             parser.print_help()
 

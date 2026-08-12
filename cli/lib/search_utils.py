@@ -5,7 +5,9 @@ from string import punctuation
 from cli.lib.config import BM25_B, BM25_K1, DEFAULT_SEARCH_LIMIT, STOPWORDS_PATH
 
 STOPWORDS: list[str] = []
-def get_stopwords():
+_STEMMER = PorterStemmer()
+
+def get_stopwords() -> list[str]:
     if not STOPWORDS:
         with open(STOPWORDS_PATH, "r") as f:
             STOPWORDS[:] = [preprocess_text(word) for word in f.read().splitlines()]
@@ -21,13 +23,13 @@ def tokenize_text_all(text: str) -> list[str]:
     tokens = text.split()
     stopwords = get_stopwords()
     valid_tokens = list(filter(lambda token: token not in stopwords and token != "", tokens))
-    stemmer = PorterStemmer()
-    valid_tokens = list(map(stemmer.stem, valid_tokens))
-    return valid_tokens
+    return list(map(_STEMMER.stem, valid_tokens))
 
 
 def tokenize_text(text: str) -> list[str]:
-    return list(set(tokenize_text_all(text)))
+    # Order-preserving dedup: set() ordering varies per PYTHONHASHSEED
+    # and made keyword-search results non-deterministic.
+    return list(dict.fromkeys(tokenize_text_all(text)))
 
 
 def tokenize_single_term(term: str) -> str:
