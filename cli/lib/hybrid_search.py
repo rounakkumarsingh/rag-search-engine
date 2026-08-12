@@ -7,6 +7,10 @@ from cli.lib.inverted_index import InvertedIndex
 import os
 
 
+def rrf_score(rank: int, k: int = 60) -> float:
+    return 1.0 / (k + rank)
+
+
 def normalize(scores: list[float]) -> list[float]:
     if not scores:
         return []
@@ -17,20 +21,28 @@ def normalize(scores: list[float]) -> list[float]:
     return [(score - min_score) / (max_score - min_score) for score in scores]
 
 
-class CombinedScores(TypedDict):
-    semantic_score: float | None
-    bm25_score: float | None
-    hybrid_score: float
-
-
 def normalize_scores(results: list[tuple[float, Document]]):
     scores = [score for score, _ in results]
     documents = [doc for _, doc in results]
     new_scores = normalize(scores)
     return list(zip(new_scores, documents))
 
+
 def hybrid_score(bm25_score: float, semantic_score: float, alpha: float = 0.5) -> float:
     return alpha * bm25_score + (1 - alpha) * semantic_score
+
+
+class CombinedScores(TypedDict):
+    semantic_score: float | None
+    bm25_score: float | None
+    hybrid_score: float
+
+
+class RRFResults(TypedDict):
+    bm25_rank: int | None
+    semantic_rank: int | None
+    rrf_score: float
+
 
 class HybridSearch:
     def __init__(self, doc_loader: Callable[[], list[Document]]) -> None:
@@ -76,5 +88,32 @@ class HybridSearch:
         ranked.sort(key=lambda item: item[0]["hybrid_score"], reverse=True)
         return ranked[:limit]
 
-    def rrf_search(self, query: str, k: int, limit: int = 10) -> list[dict]:
-        raise NotImplementedError("RRF hybrid search is not implemented yet.")
+    def rrf_search(self, query: str, k: int, limit: int = 10) -> list[tuple[RRFResults, Document]]:
+        bm25_results = self._bm25_search(query, limit * 500)
+        semantic_results = self.semantic_search.search(query, 500 * limit)
+
+        # map doc id -> document, the document's BM25/semantic ranks, and the summed RRF score
+        rank_by_id: dict[str, dict] = defaultdict(dict)
+        for rank, (_, doc) in enumerate(bm25_results, start=1):
+            entry = rank_by_id[doc.get_id()]
+            entry.setdefault("document", doc)
+            entry["bm25_rank"] = rank
+        for rank, (_, doc) in enumerate(semantic_results, start=1):
+            entry = rank_by_id[doc.get_id()]
+            entry.setdefault("document", doc)
+            entry["semantic_rank"] = rank
+
+        # compute the summed RRF score for each document
+        results: list[tuple[RRFResults, Document]] = []
+        for entry in rank_by_id.values():
+            rrf = (rrf_score(entry["bm25_rank"], k) if "bm25_rank" in entry else 0.0) + \
+                  (rrf_score(entry["semantic_rank"], k) if "semantic_rank" in entry else 0.0)
+            ranks: RRFResults = {
+                "bm25_rank": entry.get("bm25_rank"),
+                "semantic_rank": entry.get("semantic_rank"),
+                "rrf_score": rrf,
+            }
+            results.append((ranks, entry["document"]))
+
+        results.sort(key=lambda item: item[0]["rrf_score"], reverse=True)
+        return results[:limit]

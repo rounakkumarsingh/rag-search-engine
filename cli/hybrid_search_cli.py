@@ -15,6 +15,11 @@ def main() -> None:
     weighted_search_parser.add_argument("--alpha", type=float, default=0.5, help="Weighting factor (default: 0.5)")
     weighted_search_parser.add_argument("--limit", type=int, default=5, help="Maximum number of results (default: 5)")
 
+    rrf_search_parser = subparsers.add_parser("rrf-search", help="Reciprocal rank fusion hybrid search")
+    rrf_search_parser.add_argument("query", type=str, help="Search query")
+    rrf_search_parser.add_argument("-k", type=int, default=60, help="Fusion constant (default: 60)")
+    rrf_search_parser.add_argument("--limit", type=int, default=5, help="Maximum number of results (default: 5)")
+
     args = parser.parse_args()
 
     match args.command:
@@ -23,8 +28,20 @@ def main() -> None:
                 print(f"* {score:.4f}")
         case "weighted-search":
             hs = HybridSearch(load_movies)
-            hs.weighted_search(args.query, args.alpha, args.limit)
-            pass
+            results = hs.weighted_search(args.query, args.alpha, args.limit)
+            for idx, (scores, doc) in enumerate(results, start=1):
+                print(f"{idx}. {doc.get_title()}")
+                print(f"  Hybrid Score: {scores['hybrid_score']:.3f}")
+                print(f"  BM25 Rank: {scores['bm25_score'] or 0}, Semantic Rank: {scores['semantic_score'] or 0}")
+                print(f"  {doc.get_description()[:100]}")
+        case "rrf-search":
+            hs = HybridSearch(load_movies)
+            results = hs.rrf_search(args.query, args.k, args.limit)
+            for idx, (ranks, doc) in enumerate(results, start=1):
+                print(f"{idx}. {doc.get_title()}")
+                print(f"  Hybrid Score: {ranks['rrf_score']:.3f}")
+                print(f"  BM25 Rank: {ranks['bm25_rank'] or 0}, Semantic Rank: {ranks['semantic_rank'] or 0}")
+                print(f"  {doc.get_description()[:100]}")
         case _:
             parser.print_help()
 
