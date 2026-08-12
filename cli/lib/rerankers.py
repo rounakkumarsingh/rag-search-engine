@@ -1,13 +1,17 @@
 import json
+import logging
 import time
 from dataclasses import replace
 from typing import Protocol
 
 from cli.lib.document import Document
+from cli.lib.exceptions import GenerationError
 from cli.lib.llm import LLMWrapper
 from cli.lib.models import get_cross_encoder
 from cli.lib.prompts import rerank_batch_prompt, rerank_single_prompt
 from cli.lib.ranking import RRFResult
+
+logger = logging.getLogger(__name__)
 
 
 class Reranker(Protocol):
@@ -22,15 +26,26 @@ class IndividualLlmReranker:
     def rerank(self, query: str, results: list[RRFResult]) -> list[RRFResult]:
         reranked: list[RRFResult] = []
         for result in results:
-            response = self.llm.generate(rerank_single_prompt(query, result.document))
             try:
+                response = self.llm.generate(rerank_single_prompt(query, result.document))
                 score = float(response.strip())
+            except GenerationError as exc:
+                logger.warning(
+                    "LLM rerank failed for doc %s (%s); falling back to RRF order",
+                    result.document.get_id(), exc,
+                )
+                score = None
             except ValueError:
-                score = 0.0
+                score = None
             reranked.append(replace(result, rr_score=score))
             if self.delay:
                 time.sleep(self.delay)
-        reranked.sort(key=lambda item: item.rr_score, reverse=True)
+        reranked.sort(
+            key=lambda item: (
+                item.rr_score is None,
+                -item.rr_score if item.rr_score is not None else 0.0,
+            )
+        )
         return reranked
 
 

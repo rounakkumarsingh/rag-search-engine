@@ -3,7 +3,13 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from cli.lib.config import LLM_API_KEY_ENV, LLM_BASE_URL, LLM_DEFAULT_MODEL
+from cli.lib.config import (
+    LLM_API_KEY_ENV,
+    LLM_BASE_URL,
+    LLM_DEFAULT_MODEL,
+    LLM_MAX_RETRIES,
+    LLM_TIMEOUT,
+)
 from cli.lib.exceptions import GenerationError
 
 
@@ -12,7 +18,12 @@ def create_openai_client() -> OpenAI:
     api_key = os.environ.get(LLM_API_KEY_ENV)
     if not api_key:
         raise RuntimeError(f"{LLM_API_KEY_ENV} environment variable not set")
-    return OpenAI(base_url=LLM_BASE_URL, api_key=api_key)
+    return OpenAI(
+        base_url=LLM_BASE_URL,
+        api_key=api_key,
+        timeout=LLM_TIMEOUT,
+        max_retries=LLM_MAX_RETRIES,
+    )
 
 
 class LLMWrapper:
