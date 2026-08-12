@@ -82,12 +82,14 @@ class ChunkedSemanticSearch(SemanticSearch):
         for chunk_idx in range(len(self.chunk_embeddings)):
             similarity_score = cosine_similarity(query_embedding, self.chunk_embeddings[chunk_idx])
             scores.append({"chunk_idx": chunk_idx, "movie_idx": self.chunk_metadata[chunk_idx].get("document_idx"), "score": similarity_score})
-        movies_best_scores:dict[Document, float] = {}
+        movies_best_scores:dict[int, float] = {}
         for chunk_score in scores:
-            if chunk_score["movie_idx"] in movies_best_scores:
-                if chunk_score["score"] > movies_best_scores[chunk_score["movie_idx"]]:
-                    movies_best_scores[chunk_score["movie_idx"]] = chunk_score["score"]
+            idx = chunk_score["movie_idx"]
+            if idx in movies_best_scores:
+                if chunk_score["score"] > movies_best_scores[idx]:
+                    movies_best_scores[idx] = chunk_score["score"]
             else:
-                movies_best_scores[chunk_score["movie_idx"]] = chunk_score["score"]
+                movies_best_scores[idx] = chunk_score["score"]
 
-        return (sorted(movies_best_scores.items(), key=lambda item: item[1], reverse=True)[:limit])
+        ranked = sorted(movies_best_scores.items(), key=lambda item: item[1], reverse=True)[:limit]
+        return [(score, self.documents[idx]) for idx, score in ranked]

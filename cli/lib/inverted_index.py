@@ -67,8 +67,8 @@ class InvertedIndex:
         doc_scores = defaultdict(float)
         for doc_id in self.docmap.keys():
             doc_scores[doc_id] = sum(self.bm25(doc_id, query_token) for query_token in query_tokens)
-        doc_scores = dict(sorted(doc_scores.items(), key=lambda item: item[1], reverse=True))
-        return dict(islice(({self.docmap[doc_id]: score for doc_id, score in doc_scores.items() if doc_id in self.docmap}).items(), limit))
+        ranked = sorted(doc_scores.items(), key=lambda item: item[1], reverse=True)
+        return [(score, self.docmap[doc_id]) for doc_id, score in islice(ranked, limit)]
 
     def tfidf(self, doc_id, term: str) -> float:
         tf = self.get_tf(doc_id, term)

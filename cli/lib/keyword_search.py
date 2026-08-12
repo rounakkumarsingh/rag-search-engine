@@ -33,7 +33,7 @@ def bm25_tf_command(doc_id: str, term: str, k1: float = BM25_K1, b: float = BM25
     return inverted_index.get_bm25_tf(doc_id, token, k1, b)
 
 
-def bm25_search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> dict[Document, float]:
+def bm25_search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[tuple[float, Document]]:
     inverted_index = InvertedIndex(load_movies)
     try:
         inverted_index.load()
