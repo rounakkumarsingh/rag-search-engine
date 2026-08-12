@@ -1,6 +1,7 @@
 import argparse
 import sys
 
+from cli.lib.exceptions import EmptyQueryError
 from cli.lib.inverted_index import InvertedIndex
 from cli.lib.keyword_search import bm25_search_command, bm25_tf_command, search_command
 from cli.lib.movies import load_movies
@@ -50,7 +51,11 @@ def main() -> None:
 
     match args.command:
         case "search":
-            results = search_command(args.query)
+            try:
+                results = search_command(args.query)
+            except EmptyQueryError as exc:
+                print(f"Error: {exc}", file=sys.stderr)
+                sys.exit(1)
             print(f"Searching for: {args.query}")
             for i, doc in enumerate(results, 1):
                 print(f"{i}. {doc.get_title()} (ID: {doc.get_id()})")
@@ -77,7 +82,11 @@ def main() -> None:
             bm25tf = bm25_tf_command(str(args.doc_id), args.term, args.k1, args.b)
             print(f"BM25 TF score of '{args.term}' in document '{args.doc_id}': {bm25tf:.2f}")
         case "bm25search":
-            results = bm25_search_command(args.query, args.limit)
+            try:
+                results = bm25_search_command(args.query, args.limit)
+            except EmptyQueryError as exc:
+                print(f"Error: {exc}", file=sys.stderr)
+                sys.exit(1)
             for i, (score, doc) in enumerate(results, 1):
                 print(f"{i}. ({doc.get_id()}) {doc.get_title()} - Score: {score:.2f}")
         case _:

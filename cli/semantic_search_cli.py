@@ -1,6 +1,8 @@
 import argparse
+import sys
 
 from cli.lib.chunked_semantic_search import ChunkedSemanticSearch, semantic_chunks
+from cli.lib.exceptions import EmptyQueryError
 from cli.lib.movies import load_movies
 from cli.lib.search_utils import DEFAULT_SEARCH_LIMIT
 from cli.lib.semantic_search import SemanticSearch
@@ -75,12 +77,22 @@ def main() -> None:
         case "search":
             ss = SemanticSearch(load_movies)
             ss.load_or_create_embeddings()
-            for rank, (score, movie) in enumerate(ss.search(args.query, args.limit)):
+            try:
+                results = ss.search(args.query, args.limit)
+            except EmptyQueryError as exc:
+                print(f"Error: {exc}", file=sys.stderr)
+                sys.exit(1)
+            for rank, (score, movie) in enumerate(results):
                 print(f"{rank + 1}. {movie.get_title()} (score: {score})\n {movie.get_description()}")
         case "search_chunked":
             chunked_search = ChunkedSemanticSearch(load_movies)
             chunked_search.load_or_create_chunk_embeddings()
-            for i, (score, movie) in enumerate(chunked_search.search(args.query, args.limit), start=1):
+            try:
+                results = chunked_search.search(args.query, args.limit)
+            except EmptyQueryError as exc:
+                print(f"Error: {exc}", file=sys.stderr)
+                sys.exit(1)
+            for i, (score, movie) in enumerate(results, start=1):
                 print(f"\n{i}. {movie.get_title()} (score: {score:.4f})")
                 print(f"   {movie.get_description()[:100]}...")
         case "semantic_chunk":

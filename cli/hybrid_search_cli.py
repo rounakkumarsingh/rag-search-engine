@@ -1,11 +1,18 @@
-from cli.lib.config import LLM_RERANK_MODEL
+import argparse
+import sys
+
+from cli.lib.config import (
+    DEFAULT_SEARCH_LIMIT,
+    LLM_RERANK_MODEL,
+    RERANK_FETCH_MULTIPLIER,
+)
+from cli.lib.exceptions import EmptyQueryError
 from cli.lib.llm import LLMWrapper
 from cli.lib.movies import load_movies
 from cli.lib.hybrid_search import HybridSearch
 from cli.lib.prompts import expand_query_prompt, rewrite_query_prompt, spell_fix_prompt
-from cli.lib.ranking import normalize
+from cli.lib.ranking import RRF_K, normalize
 from cli.lib.rerankers import make_reranker
-import argparse
 
 ENHANCE_PROMPTS = {
     "spell": spell_fix_prompt,
@@ -24,12 +31,12 @@ def main() -> None:
     weighted_search_parser = subparsers.add_parser("weighted-search", help="Weighted hybrid search")
     weighted_search_parser.add_argument("query", type=str, help="Search query")
     weighted_search_parser.add_argument("--alpha", type=float, default=0.5, help="Weighting factor (default: 0.5)")
-    weighted_search_parser.add_argument("--limit", type=int, default=5, help="Maximum number of results (default: 5)")
+    weighted_search_parser.add_argument("--limit", type=int, default=DEFAULT_SEARCH_LIMIT, help="Maximum number of results (default: 5)")
 
     rrf_search_parser = subparsers.add_parser("rrf-search", help="Reciprocal rank fusion hybrid search")
     rrf_search_parser.add_argument("query", type=str, help="Search query")
-    rrf_search_parser.add_argument("-k", type=int, default=60, help="Fusion constant (default: 60)")
-    rrf_search_parser.add_argument("--limit", type=int, default=5, help="Maximum number of results (default: 5)")
+    rrf_search_parser.add_argument("-k", type=int, default=RRF_K, help="Fusion constant (default: 60)")
+    rrf_search_parser.add_argument("--limit", type=int, default=DEFAULT_SEARCH_LIMIT, help="Maximum number of results (default: 5)")
     rrf_search_parser.add_argument(
         "--enhance",
         type=str,
@@ -52,7 +59,11 @@ def main() -> None:
                 print(f"* {score:.4f}")
         case "weighted-search":
             hs = HybridSearch(load_movies)
-            results = hs.weighted_search(args.query, args.alpha, args.limit)
+            try:
+                results = hs.weighted_search(args.query, args.alpha, args.limit)
+            except EmptyQueryError as exc:
+                print(f"Error: {exc}", file=sys.stderr)
+                sys.exit(1)
             for idx, result in enumerate(results, start=1):
                 print(f"{idx}. {result.document.get_title()}")
                 print(f"  Hybrid Score: {result.hybrid_score:.3f}")
@@ -68,8 +79,12 @@ def main() -> None:
                 print(f"Enhanced query ({args.enhance}): '{query}' -> '{response}'\n")
                 query = response
 
-            rr_limit = args.limit * 5 if args.rerank_method != "none" else args.limit
-            results = hs.rrf_search(query, args.k, rr_limit)
+            try:
+                rr_limit = args.limit * RERANK_FETCH_MULTIPLIER if args.rerank_method != "none" else args.limit
+                results = hs.rrf_search(query, args.k, rr_limit)
+            except EmptyQueryError as exc:
+                print(f"Error: {exc}", file=sys.stderr)
+                sys.exit(1)
 
             reranker = make_reranker(args.rerank_method, llm)
             if reranker is not None:

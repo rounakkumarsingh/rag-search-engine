@@ -1,5 +1,9 @@
+from typing import Callable
+
 from cli.lib.chunked_semantic_search import ChunkedSemanticSearch
+from cli.lib.config import DEFAULT_SEARCH_LIMIT, SEMANTIC_CANDIDATE_MULTIPLIER
 from cli.lib.document import Document
+from cli.lib.exceptions import EmptyQueryError
 from cli.lib.inverted_index import InvertedIndex
 from cli.lib.ranking import (
     RRFResult,
@@ -8,7 +12,6 @@ from cli.lib.ranking import (
     normalize_scores,
     rrf_score,
 )
-from typing import Callable
 
 
 class HybridSearch:
@@ -21,8 +24,10 @@ class HybridSearch:
     def _bm25_search(self, query: str, limit: int) -> list[tuple[float, Document]]:
         return self.idx.bm25_search(query, limit)
 
-    def weighted_search(self, query: str, alpha: float, limit: int = 5) -> list[WeightedResult]:
-        candidate_limit = limit * 500
+    def weighted_search(self, query: str, alpha: float, limit: int = DEFAULT_SEARCH_LIMIT) -> list[WeightedResult]:
+        if not query.strip():
+            raise EmptyQueryError("Query is empty")
+        candidate_limit = limit * SEMANTIC_CANDIDATE_MULTIPLIER
         keyword_results = normalize_scores(self._bm25_search(query, candidate_limit))
         semantic_results = normalize_scores(self.semantic_search.search(query, candidate_limit))
 
@@ -55,8 +60,10 @@ class HybridSearch:
         results.sort(key=lambda item: item.hybrid_score, reverse=True)
         return results[:limit]
 
-    def rrf_search(self, query: str, k: int, limit: int = 10) -> list[RRFResult]:
-        candidate_limit = limit * 500
+    def rrf_search(self, query: str, k: int, limit: int = DEFAULT_SEARCH_LIMIT) -> list[RRFResult]:
+        if not query.strip():
+            raise EmptyQueryError("Query is empty")
+        candidate_limit = limit * SEMANTIC_CANDIDATE_MULTIPLIER
         bm25_results = self._bm25_search(query, candidate_limit)
         semantic_results = self.semantic_search.search(query, candidate_limit)
 

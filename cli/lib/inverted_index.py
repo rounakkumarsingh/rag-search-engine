@@ -11,6 +11,7 @@ from cli.lib.config import (
 )
 from cli.lib.search_utils import tokenize_text_all, BM25_K1, BM25_B, DEFAULT_SEARCH_LIMIT
 from cli.lib.document import Document
+from cli.lib.exceptions import EmptyQueryError, IndexNotFoundError
 
 INDEX_ARTIFACTS: list = [
     INDEX_CACHE_PATH,
@@ -92,6 +93,8 @@ class InvertedIndex:
 
     def bm25_search(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[tuple[float, Document]]:
         query_tokens = tokenize_text_all(query)
+        if not query_tokens:
+            raise EmptyQueryError("Query produced no searchable tokens")
         doc_scores = defaultdict(float)
         for doc_id in self.docmap.keys():
             doc_scores[doc_id] = sum(self.bm25(doc_id, query_token) for query_token in query_tokens)
@@ -111,7 +114,7 @@ class InvertedIndex:
 
     def load(self) -> None:
         if not exists_all(INDEX_ARTIFACTS):
-            raise FileNotFoundError(
+            raise IndexNotFoundError(
                 "Inverted index cache is incomplete; rebuild it with `build` or `load_or_build`."
             )
         self.index = load_pickle(INDEX_CACHE_PATH)
