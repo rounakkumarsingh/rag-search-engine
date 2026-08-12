@@ -1,3 +1,4 @@
+import hashlib
 import json
 import pickle
 from pathlib import Path
@@ -5,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from cli.lib.config import CACHE_DIR
+from cli.lib.config import CACHE_DIR, DATA_PATH
 
 
 PathLike = str | Path
@@ -61,6 +62,12 @@ def load_numpy_if_valid(path: PathLike, expected_rows: int | None = None) -> np.
     if expected_rows is not None and array.shape[0] != expected_rows:
         return None
     return array
+
+
+def source_fingerprint(path: PathLike | None = None) -> str:
+    """SHA-256 of the source data file, used to invalidate stale caches."""
+    path = _as_path(path if path is not None else DATA_PATH)
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def cache_dir() -> Path:
