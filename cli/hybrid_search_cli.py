@@ -2,6 +2,7 @@ from cli.lib.llm import LLMWrapper
 from cli.lib.movies import load_movies
 from cli.lib.hybrid_search import HybridSearch, normalize
 import argparse
+import time
 
 
 def main() -> None:
@@ -25,6 +26,13 @@ def main() -> None:
         type=str,
         choices=["spell", "rewrite", "expand"],
         help="Query enhancement method",
+    )
+    rrf_search_parser.add_argument(
+        "--rerank-method",
+        type=str,
+        default="individual",
+        choices=["individual"],
+        help="Result reranking method (default: individual)",
     )
 
     args = parser.parse_args()
@@ -97,10 +105,44 @@ User query: "{args.query}"
                 print(f"Enhanced query ({args.enhance}): '{args.query}' -> '{response}'\n")
                 args.query = response
 
+            if (args.rerank_method == "individual"):
+                args.limit *= 5
             results = hs.rrf_search(args.query, args.k, args.limit)
+
+            if args.rerank_method == "individual":
+                print(f"Re-ranking top {len(results)} results using individual method...")
+                for i, (ranks, doc) in enumerate(results):
+                    PROMPT = f"""Rate how well this movie matches the search query.
+
+Query: "{args.query}"
+Movie: {doc.get_title()} - {doc.get_description()}
+
+Consider:
+- Direct relevance to query
+- User intent (what they're looking for)
+- Content appropriateness
+
+Rate 0-10 (10 = perfect match).
+Output ONLY the number in your response, no other text or explanation.
+
+Score:"""
+                    response = llm.generate(PROMPT)
+                    try:
+                        rr_score = float(response.strip())
+                    except ValueError:
+                        rr_score = 0.0
+                    ranks["rr_score"] = rr_score
+                    time.sleep(3)
+
+            if args.rerank_method == "individual":
+                results.sort(key=lambda item: item[0]["rr_score"], reverse=True)
+                results = results[:args.limit]
+
             for idx, (ranks, doc) in enumerate(results, start=1):
                 print(f"{idx}. {doc.get_title()}")
-                print(f"  Hybrid Score: {ranks['rrf_score']:.3f}")
+                if args.rerank_method == "individual":
+                    print(f"  Re-rank Score: {ranks['rr_score']:.3f}/10")
+                print(f"  RRF Score: {ranks['rrf_score']:.3f}")
                 print(f"  BM25 Rank: {ranks['bm25_rank'] or 0}, Semantic Rank: {ranks['semantic_rank'] or 0}")
                 print(f"  {doc.get_description()[:100]}")
         case _:
