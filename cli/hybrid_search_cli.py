@@ -1,3 +1,4 @@
+from sentence_transformers import CrossEncoder
 from cli.lib.llm import LLMWrapper
 from cli.lib.movies import load_movies
 from cli.lib.hybrid_search import HybridSearch, normalize
@@ -32,7 +33,7 @@ def main() -> None:
         "--rerank-method",
         type=str,
         default="individual",
-        choices=["individual", "batch"],
+        choices=["individual", "batch", "cross_encoder"],
         help="Result reranking method (default: individual)",
     )
 
@@ -106,7 +107,7 @@ User query: "{args.query}"
                 print(f"Enhanced query ({args.enhance}): '{args.query}' -> '{response}'\n")
                 args.query = response
 
-            rr_limit = args.limit * 5 if args.rerank_method in ["individual", "batch"] else args.limit
+            rr_limit = args.limit * 5 if args.rerank_method else args.limit
             results = hs.rrf_search(args.query, args.k, rr_limit)
 
             if args.rerank_method == "individual":
@@ -179,12 +180,25 @@ Ranking:"""
 
                 results = ranked_results[:args.limit]
 
+            elif args.rerank_method == "cross_encoder":
+                pairs: list[list[str]] = []
+                for _, doc in results:
+                    pairs.append([args.query, doc.to_text()])
+                cross_encoder = CrossEncoder("cross-encoder/ms-marco-TinyBERT-L2-v2")
+                scores = cross_encoder.predict(pairs)
+                for (ranks, doc), score in zip(results, scores):
+                    ranks["rr_score"] = float(score)
+                results.sort(key=lambda item: item[0]["rr_score"], reverse=True)
+                results = results[:args.limit]
+
             for idx, (ranks, doc) in enumerate(results, start=1):
                 print(f"{idx}. {doc.get_title()}")
                 if args.rerank_method == "individual":
                     print(f"  Re-rank Score: {ranks['rr_score']:.3f}/10")
                 elif args.rerank_method == "batch":
                     print(f"  Re-rank Rank: {ranks['rr_rank']}")
+                elif args.rerank_method == "cross_encoder":
+                    print(f"  Re-rank Score: {ranks['rr_score']:.3f}")
                 print(f"  RRF Score: {ranks['rrf_score']:.3f}")
                 print(f"  BM25 Rank: {ranks['bm25_rank'] or 0}, Semantic Rank: {ranks['semantic_rank'] or 0}")
                 print(f"  {doc.get_description()[:100]}")
