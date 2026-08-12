@@ -1,10 +1,9 @@
 from collections import defaultdict
-from cli.lib.movies import PROJECT_ROOT
+from cli.lib.config import INDEX_CACHE_PATH
 from cli.lib.chunked_semantic_search import ChunkedSemanticSearch
 from cli.lib.document import Document
 from typing import Callable, TypedDict
 from cli.lib.inverted_index import InvertedIndex
-import os
 
 
 def rrf_score(rank: int, k: int = 60) -> float:
@@ -51,7 +50,7 @@ class HybridSearch:
         self.semantic_search.load_or_create_chunk_embeddings()
 
         self.idx = InvertedIndex(self.doc_loader)
-        if not os.path.exists(PROJECT_ROOT / "cache" / "index.pkl"):
+        if not INDEX_CACHE_PATH.exists():
             self.idx.build()
             self.idx.save()
 

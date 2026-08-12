@@ -1,9 +1,7 @@
 import json
-from pathlib import Path
-from cli.lib.document import Document
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-DATA_PATH = PROJECT_ROOT / "data" / "movies.json"
+from cli.lib.config import DATA_PATH
+from cli.lib.document import Document
 
 
 class MovieDocument:
