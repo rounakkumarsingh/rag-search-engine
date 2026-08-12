@@ -1,3 +1,4 @@
+from cli.lib.llm import LLMWrapper
 from cli.lib.movies import load_movies
 from cli.lib.hybrid_search import HybridSearch, normalize
 import argparse
@@ -19,6 +20,12 @@ def main() -> None:
     rrf_search_parser.add_argument("query", type=str, help="Search query")
     rrf_search_parser.add_argument("-k", type=int, default=60, help="Fusion constant (default: 60)")
     rrf_search_parser.add_argument("--limit", type=int, default=5, help="Maximum number of results (default: 5)")
+    rrf_search_parser.add_argument(
+        "--enhance",
+        type=str,
+        choices=["spell"],
+        help="Query enhancement method",
+    )
 
     args = parser.parse_args()
 
@@ -36,6 +43,20 @@ def main() -> None:
                 print(f"  {doc.get_description()[:100]}")
         case "rrf-search":
             hs = HybridSearch(load_movies)
+            llm = LLMWrapper()
+            if (args.enhance == "spell"):
+                PROMPT = f"""Fix any spelling errors in the user-provided movie search query below.
+Correct only clear, high-confidence typos. Do not rewrite, add, remove, or reorder words.
+Preserve punctuation and capitalization unless a change is required for a typo fix.
+If there are no spelling errors, or if you're unsure, output the original query unchanged.
+Output only the final query text, nothing else.
+User query: "{args.query}"
+"""
+
+                response = llm.generate(PROMPT)
+                print(f"Enhanced query ({args.enhance}): '{args.query}' -> '{response}'\n")
+                args.query = response
+
             results = hs.rrf_search(args.query, args.k, args.limit)
             for idx, (ranks, doc) in enumerate(results, start=1):
                 print(f"{idx}. {doc.get_title()}")
