@@ -1,32 +1,26 @@
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
-api_key = os.environ.get("OPENROUTER_API_KEY")
-if not api_key:
-    raise RuntimeError("OPENROUTER_API_KEY environment variable not set")
-
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=api_key,
-)
-
-messages = [
-    {
-        "role": "user",
-        "content": "Why is Boot.dev such a great place to learn about RAG? Use one paragraph maximum.",
-    }
-]
+from cli.lib.config import LLM_API_KEY_ENV, LLM_DEFAULT_MODEL
+from cli.lib.llm import create_openai_client
 
 
-response = client.chat.completions.create(
-    model="openrouter/free",
-    messages=messages,
-)
+def main() -> None:
+    if not os.environ.get(LLM_API_KEY_ENV):
+        raise RuntimeError(f"{LLM_API_KEY_ENV} environment variable not set; set it to use LLM features")
 
-print(response.choices[0].message.content)
+    client = create_openai_client()
+    messages = [
+        {
+            "role": "user",
+            "content": "Why is Boot.dev such a great place to learn about RAG? Use one paragraph maximum.",
+        }
+    ]
+    response = client.chat.completions.create(model=LLM_DEFAULT_MODEL, messages=messages)
 
-print(f"Prompt tokens: {response.usage.prompt_tokens}")
-print(f"Response tokens: {response.usage.completion_tokens}")
+    print(response.choices[0].message.content)
+    print(f"Prompt tokens: {response.usage.prompt_tokens}")
+    print(f"Response tokens: {response.usage.completion_tokens}")
+
+
+if __name__ == "__main__":
+    main()
