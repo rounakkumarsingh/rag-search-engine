@@ -1,15 +1,15 @@
 from typing import Callable
 from cli.lib.caches import load_numpy_if_valid, save_numpy
-from cli.lib.config import EMBEDDINGS_CACHE_PATH, EMBEDDING_MODEL
+from cli.lib.config import EMBEDDINGS_CACHE_PATH
+from cli.lib.models import get_embedder
 from cli.lib.movies import load_movies
 from cli.lib.document import Document
 from cli.lib.search_utils import DEFAULT_SEARCH_LIMIT
-from sentence_transformers import SentenceTransformer
 import numpy as np
 
 class SemanticSearch():
     def __init__(self, loader: Callable[[], list[Document]]):
-        self.model = SentenceTransformer(EMBEDDING_MODEL)
+        self.model = get_embedder()
         self.embeddings: np.ndarray | None = None
         self.documents: list[Document] = []
         self.document_map: dict[str, Document] = {}
