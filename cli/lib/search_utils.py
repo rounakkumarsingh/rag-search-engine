@@ -1,14 +1,8 @@
 from typing import Final
-import os
 from nltk.stem.porter import PorterStemmer
 from string import punctuation
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-STOPWORDS_PATH = os.path.join(PROJECT_ROOT, "data", "stopwords.txt")
-DEFAULT_SEARCH_LIMIT: Final = 5
-
-BM25_K1 = 1.5
-BM25_B = 0.75
+from cli.lib.config import BM25_B, BM25_K1, DEFAULT_SEARCH_LIMIT, STOPWORDS_PATH
 
 STOPWORDS: list[str] = []
 def get_stopwords():
