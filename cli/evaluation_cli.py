@@ -29,8 +29,11 @@ def main() -> None:
             if result.document.get_title() in test_case["relevant_docs"]:
                 correct_retrieved.append(result.document.get_title())
                 cnt += 1
+        precision = cnt / len(results)
+        recall =  cnt / test_case["relevant_docs"]
         print(f"- Query: {query}")
-        print(f"  - Precision@{limit}: {round(cnt / len(results), 4)}")
+        print(f"  - Precision@{limit}: {precision:.4f}")
+        print(f"  - Recall@{limit}: {recall:.4f}")
         print(f"Retrieved: {", ".join(correct_retrieved)}")
         print(f"Relevant: {", ".join(test_case["relevant_docs"])}")
 
