@@ -30,7 +30,7 @@ CROSS_ENCODER_MODEL: str = "cross-encoder/ms-marco-TinyBERT-L2-v2"
 
 LLM_BASE_URL: str = "https://openrouter.ai/api/v1"
 LLM_API_KEY_ENV: str = "OPENROUTER_API_KEY"
-LLM_DEFAULT_MODEL: str = "openrouter/free"
+LLM_DEFAULT_MODEL: str = "google/gemma-4-26b-a4b-it:free"
 LLM_RERANK_MODEL: str = "google/gemma-4-26b-a4b-it:free"
 LLM_TIMEOUT: float = 60.0
 LLM_MAX_RETRIES: int = 2
