@@ -30,10 +30,12 @@ def main() -> None:
                 correct_retrieved.append(result.document.get_title())
                 cnt += 1
         precision = cnt / len(results)
-        recall =  cnt / test_case["relevant_docs"]
+        recall =  cnt / len(test_case["relevant_docs"])
+        f1 = 2 * (precision * recall) / (precision + recall)
         print(f"- Query: {query}")
         print(f"  - Precision@{limit}: {precision:.4f}")
         print(f"  - Recall@{limit}: {recall:.4f}")
+        print(f"  - F1 Score: {f1:.4f}")
         print(f"Retrieved: {", ".join(correct_retrieved)}")
         print(f"Relevant: {", ".join(test_case["relevant_docs"])}")
 
