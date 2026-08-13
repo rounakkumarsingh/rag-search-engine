@@ -62,6 +62,24 @@ Answer:"""
     return llm.generate(prompt)
 
 
+def answer_question(question: str, context: str, llm: LLMWrapper) -> str:
+    prompt = f"""Answer the user's question based on the provided movies that are available on Webflyx, a streaming service.
+
+Question: {question}
+
+Documents:
+{context}
+
+Instructions:
+- Answer questions directly and concisely
+- Be casual and conversational
+- Don't be cringe or hype-y
+- Talk like a normal person would in a chat conversation
+
+Answer:"""
+    return llm.generate(prompt)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Retrieval Augmented Generation CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -101,6 +119,19 @@ def main() -> None:
         type=int,
         default=5,
         help="Number of search results to cite (default: 5)",
+    )
+
+    question_parser = subparsers.add_parser(
+            "question", help="Answer a user's question based on search results"
+            )
+    question_parser.add_argument(
+        "question", type=str, help="The user's question"
+    )
+    question_parser.add_argument(
+        "--limit",
+        type=int,
+        default=5,
+        help="Number of search results to use (default: 5)",
     )
 
     args = parser.parse_args()
@@ -174,6 +205,29 @@ def main() -> None:
             for result in results:
                 print(f"- {result.document.get_title()}")
             print("\nLLM Answer:")
+            print(answer)
+        case "question":
+            question = args.question
+
+            search = HybridSearch(load_movies)
+            try:
+                results = search.rrf_search(question, RRF_K, args.limit)
+            except EmptyQueryError as exc:
+                print(f"Error: {exc}", file=sys.stderr)
+                sys.exit(1)
+
+            context = "\n".join(
+                f"{idx}. {result.document.get_title()}: {result.document.get_description()}"
+                for idx, result in enumerate(results, start=1)
+            )
+
+            llm = LLMWrapper(LLM_DEFAULT_MODEL)
+            answer = answer_question(question, context, llm)
+
+            print("Search Results:")
+            for result in results:
+                print(f"- {result.document.get_title()}")
+            print("\nAnswer:")
             print(answer)
         case _:
             parser.print_help()
