@@ -14,6 +14,8 @@ DOC_LENGTHS_CACHE_PATH: Path = CACHE_DIR / "doc_lengths.pkl"
 
 EMBEDDINGS_CACHE_PATH: Path = CACHE_DIR / "embeddings.npy"
 EMBEDDINGS_META_CACHE_PATH: Path = CACHE_DIR / "embeddings.meta.json"
+FAISS_INDEX_CACHE_PATH: Path = CACHE_DIR / "faiss.index"
+FAISS_CHUNK_INDEX_CACHE_PATH: Path = CACHE_DIR / "faiss_chunk.index"
 CHUNK_EMBEDDINGS_CACHE_PATH: Path = CACHE_DIR / "chunk_embeddings.npy"
 CHUNK_METADATA_CACHE_PATH: Path = CACHE_DIR / "chunk_metadata.json"
 
@@ -24,6 +26,7 @@ BM25_B: float = 0.75
 
 SEMANTIC_CANDIDATE_MULTIPLIER: int = 500
 RERANK_FETCH_MULTIPLIER: int = 5
+FAISS_CHUNK_CANDIDATE_MULTIPLIER: int = 20
 
 EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
 CROSS_ENCODER_MODEL: str = "cross-encoder/ms-marco-TinyBERT-L2-v2"

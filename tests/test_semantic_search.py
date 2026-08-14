@@ -13,6 +13,7 @@ FINGERPRINT = "abc123"
 def _patch_config(monkeypatch, tmp_path):
     monkeypatch.setattr(sem, "EMBEDDINGS_CACHE_PATH", tmp_path / "embeddings.npy")
     monkeypatch.setattr(sem, "EMBEDDINGS_META_CACHE_PATH", tmp_path / "embeddings.meta.json")
+    monkeypatch.setattr(sem, "FAISS_INDEX_CACHE_PATH", tmp_path / "faiss.index")
     monkeypatch.setattr(sem, "source_fingerprint", lambda: FINGERPRINT)
 
 

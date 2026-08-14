@@ -6,8 +6,15 @@ import json
 from typing import Callable, TypedDict
 
 from cli.lib.caches import load_json, load_numpy_if_valid, save_json, save_numpy, source_fingerprint
-from cli.lib.config import CHUNK_EMBEDDINGS_CACHE_PATH, CHUNK_METADATA_CACHE_PATH, EMBEDDING_MODEL
+from cli.lib.config import (
+    CHUNK_EMBEDDINGS_CACHE_PATH,
+    CHUNK_METADATA_CACHE_PATH,
+    EMBEDDING_MODEL,
+    FAISS_CHUNK_CANDIDATE_MULTIPLIER,
+    FAISS_CHUNK_INDEX_CACHE_PATH,
+)
 from cli.lib.document import Document
+from cli.lib.faiss_index import build_flat_index, cosine_search, load_index, save_index
 from cli.lib.models import get_embedder
 from cli.lib.search_utils import DEFAULT_SEARCH_LIMIT
 from cli.lib.semantic_search import SemanticSearch
@@ -48,6 +55,7 @@ class ChunkedSemanticSearch(SemanticSearch):
         self.chunk_embeddings: numpy.ndarray | None = None
         self.chunk_metadata: list[ChunkMetadata] = []
         self.document_positions: dict[str, int] = {}
+        self.chunk_index: object | None = None
 
     def _load_documents(self) -> None:
         super()._load_documents()
@@ -73,6 +81,8 @@ class ChunkedSemanticSearch(SemanticSearch):
                     "document_id": document.get_id(),
                 })
         self.chunk_embeddings = numpy.asarray(get_embedder().encode(chunks, show_progress_bar=True))
+        self.chunk_index = build_flat_index(self.chunk_embeddings)
+        save_index(self.chunk_index, FAISS_CHUNK_INDEX_CACHE_PATH)
         save_numpy(CHUNK_EMBEDDINGS_CACHE_PATH, self.chunk_embeddings)
         save_json(CHUNK_METADATA_CACHE_PATH, {
             "chunks": self.chunk_metadata,
@@ -99,28 +109,36 @@ class ChunkedSemanticSearch(SemanticSearch):
             if cached is not None and isinstance(metadata, list) and len(cached) == len(metadata) and legacy_or_current:
                 self.chunk_embeddings = cached
                 self.chunk_metadata = metadata
+                self._load_chunk_index()
                 return self.chunk_embeddings
         return self.build_chunk_embeddings()
+
+    def _load_chunk_index(self) -> None:
+        if self.chunk_embeddings is None:
+            raise ValueError("No chunk embeddings loaded. Call `load_or_create_chunk_embeddings` first.")
+        try:
+            self.chunk_index = load_index(FAISS_CHUNK_INDEX_CACHE_PATH)
+        except (RuntimeError, OSError, ValueError):
+            # The chunk embeddings cache is valid but the FAISS index is
+            # missing or corrupt; rebuild it from the cached embeddings.
+            self.chunk_index = build_flat_index(self.chunk_embeddings)
+            save_index(self.chunk_index, FAISS_CHUNK_INDEX_CACHE_PATH)
 
     def search(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[tuple[float, Document]]:
         if not query.strip():
             raise EmptyQueryError("Query is empty")
-        if self.chunk_embeddings is None:
+        if self.chunk_embeddings is None or self.chunk_index is None:
             raise ValueError("No chunk embeddings loaded. Call `load_or_create_chunk_embeddings` first.")
         query_embedding = self.generate_embedding(query)
 
-        query_norm = numpy.linalg.norm(query_embedding)
-        chunk_norms = numpy.linalg.norm(self.chunk_embeddings, axis=1)
-        denominators = chunk_norms * query_norm
-        similarities = numpy.zeros(len(self.chunk_embeddings))
-        nonzero = denominators != 0
-        similarities[nonzero] = (
-            self.chunk_embeddings[nonzero] @ query_embedding
-        ) / denominators[nonzero]
+        candidate_limit = limit * FAISS_CHUNK_CANDIDATE_MULTIPLIER
+        similarities, indices = cosine_search(self.chunk_index, query_embedding, candidate_limit)
 
         movies_best_scores: dict[int, float] = {}
-        for chunk_idx, metadata in enumerate(self.chunk_metadata):
-            score = float(similarities[chunk_idx])
+        for score, chunk_idx in zip(similarities, indices):
+            if chunk_idx < 0 or int(chunk_idx) >= len(self.chunk_metadata):
+                continue
+            metadata = self.chunk_metadata[int(chunk_idx)]
             doc_id = metadata.get("document_id")
             if doc_id is not None:
                 doc_pos = self.document_positions.get(doc_id, metadata["document_idx"])

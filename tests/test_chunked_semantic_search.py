@@ -12,6 +12,7 @@ FINGERPRINT = "chunk-fp1"
 def _patch_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(cse, "CHUNK_EMBEDDINGS_CACHE_PATH", tmp_path / "chunk_embeddings.npy")
     monkeypatch.setattr(cse, "CHUNK_METADATA_CACHE_PATH", tmp_path / "chunk_metadata.json")
+    monkeypatch.setattr(cse, "FAISS_CHUNK_INDEX_CACHE_PATH", tmp_path / "faiss_chunk.index")
     monkeypatch.setattr(cse, "source_fingerprint", lambda: FINGERPRINT)
 
 

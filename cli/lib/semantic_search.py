@@ -14,7 +14,9 @@ from cli.lib.config import (
     EMBEDDINGS_CACHE_PATH,
     EMBEDDINGS_META_CACHE_PATH,
     EMBEDDING_MODEL,
+    FAISS_INDEX_CACHE_PATH,
 )
+from cli.lib.faiss_index import build_flat_index, cosine_search, load_index, save_index
 from cli.lib.models import get_embedder
 from cli.lib.document import Document
 from cli.lib.search_utils import DEFAULT_SEARCH_LIMIT
@@ -24,6 +26,7 @@ class SemanticSearch():
     def __init__(self, loader: Callable[[], list[Document]]):
         self.model = get_embedder()
         self.embeddings: np.ndarray | None = None
+        self.index: object | None = None
         self.documents: list[Document] = []
         self.document_map: dict[str, Document] = {}
         self.doc_loader = loader
@@ -42,6 +45,8 @@ class SemanticSearch():
         self._load_documents()
         doc_strings = [document.to_text() for document in self.documents]
         self.embeddings = self.model.encode(doc_strings, show_progress_bar=True)
+        self.index = build_flat_index(self.embeddings)
+        save_index(self.index, FAISS_INDEX_CACHE_PATH)
         save_numpy(EMBEDDINGS_CACHE_PATH, self.embeddings)
         save_json(EMBEDDINGS_META_CACHE_PATH, {
             "fingerprint": source_fingerprint(),
@@ -58,6 +63,17 @@ class SemanticSearch():
             and meta.get("embedder") == EMBEDDING_MODEL
         )
 
+    def _load_index(self) -> None:
+        if self.embeddings is None:
+            raise ValueError("No embeddings loaded. Call `load_or_create_embeddings` first.")
+        try:
+            self.index = load_index(FAISS_INDEX_CACHE_PATH)
+        except (RuntimeError, OSError, ValueError):
+            # The embeddings cache is valid but the FAISS index is missing or
+            # corrupt; rebuild it from the cached embeddings.
+            self.index = build_flat_index(self.embeddings)
+            save_index(self.index, FAISS_INDEX_CACHE_PATH)
+
     def load_or_create_embeddings(self) -> np.ndarray:
         self._load_documents()
         valid = load_numpy_if_valid(EMBEDDINGS_CACHE_PATH, expected_rows=len(self.documents))
@@ -66,6 +82,7 @@ class SemanticSearch():
                 try:
                     if self._cache_is_valid():
                         self.embeddings = valid
+                        self._load_index()
                         return self.embeddings
                 except json.JSONDecodeError as exc:
                     raise CacheInvalidError("Embeddings metadata cache is unreadable") from exc
@@ -75,14 +92,16 @@ class SemanticSearch():
     def search(self, query: str, limit = DEFAULT_SEARCH_LIMIT) -> list[tuple[float, Document]]:
         if not query.strip():
             raise EmptyQueryError("Query is empty")
-        if self.embeddings is None:
+        if self.embeddings is None or self.index is None:
             raise ValueError("No embeddings loaded. Call `load_or_create_embeddings` first.")
-        query_embeddings = self.generate_embedding(query)
-        scores: list[tuple[float, Document]] = []
-        for pos, document in enumerate(self.documents):
-            scores.append(((cosine_similarity(self.embeddings[pos], query_embeddings)), document))
-        scores.sort(key=lambda x: x[0], reverse=True)
-        return scores[:limit]
+        query_embedding = self.generate_embedding(query)
+        scores, indices = cosine_search(self.index, query_embedding, limit)
+        results: list[tuple[float, Document]] = []
+        for score, pos in zip(scores, indices):
+            if pos < 0 or pos >= len(self.documents):
+                continue
+            results.append((float(score), self.documents[pos]))
+        return results
 
     def verify(self) -> str:
         return (
